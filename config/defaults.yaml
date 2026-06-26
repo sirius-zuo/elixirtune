@@ -1,0 +1,20 @@
+teacher:
+  base_url: http://localhost:8080/v1
+  model: qwen3.6
+  api_key: ""
+  temperature: 0.8
+bootstrap:
+  starter_count: 20
+generate:
+  target_size: 2000
+  fewshot_k: 4
+  cot: true
+refine:
+  passes: []
+  self_refine: {model: qwen3.6}
+  critique_revise: {model: qwen3.6}
+filter:
+  schema: {max_tokens: 2048}
+  dedup: {embedding_model: all-MiniLM-L6-v2, similarity_threshold: 0.92}
+  judge: {model: qwen3.6, score_cutoff: 4}
+  diversity: {quotas: {bug: 0.4, style: 0.3, perf: 0.3}}
