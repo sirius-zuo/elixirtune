@@ -2,7 +2,7 @@
 
 ## Goal
 
-Replace the broken `src/training/` module and the numbered `scripts/` folder with a clean, maintainable architecture: a `commands/` package backed by mlx-tune (SFT + DPO + GRPO), and a `cli.py` that is the single entry point for all pipeline operations.
+Replace the broken `src/training/` module and the numbered `scripts/` folder with a clean, maintainable architecture: a `commands/` package backed by mlx-tune (SFT + DPO + GRPO), and a `cli.py` that is the single entry point for all pipeline operations. Delete all leftover artifacts from the original fine-tune-llm project that have no place in ElixirLoRA's workspace-per-domain model.
 
 ## Architecture
 
@@ -247,6 +247,85 @@ DPO requires `{"prompt": str, "chosen": str, "rejected": str}` triples. GRPO req
 
 ---
 
+---
+
+## Cleanup: fine-tune-llm leftovers
+
+These files were inherited from the original fine-tune-llm project and have no place in ElixirLoRA's architecture.
+
+### Delete entirely
+
+| Path | Reason |
+|---|---|
+| `demo_pipeline.py` | Demos old numbered scripts, old `models/` layout, old blog-QA dataset. No ElixirLoRA concept in it. |
+| `fine-tune-playground.ipynb` | Hardcoded to `didierlopes/my-blog-qa-dataset`, uses the broken `mlx_lm.tuner` internal APIs, references the `fine-tune-llm` conda environment. Entirely the old project. |
+| `config/data_config.yaml` | Specifies `didierlopes/my-blog-qa-dataset` and Phi-3 formatting. Not a generic config — specific to the old demo. |
+| `venv/` | Old virtualenv directory. Project uses `.venv/`. |
+
+### Update: `config/` templates
+
+Three config files survive as **global default templates** for workspace configs (read by `generate_runtime_configs()` and then by `commands/train.py`, `commands/evaluate.py`). Each needs its hardcoded `paths:` block removed — paths are now computed per-domain by the command layer, not read from global config.
+
+**`config/model_config.yaml`** — remove `paths:` block, keep LoRA params:
+```yaml
+# REMOVE: paths: {adapter_dir, fused_model_dir, checkpoint_dir}
+# These are workspace-managed: workspaces/{domain}/adapters/, etc.
+base_model:
+  path: "microsoft/Phi-3-mini-4k-instruct"
+lora:
+  num_layers: 32
+  lora_layers: 32
+  rank: 16
+  scale: 20.0
+  dropout: 0.1
+  keys: [self_attn.q_proj, self_attn.k_proj, self_attn.v_proj, self_attn.o_proj]
+```
+
+**`config/training_config.yaml`** — remove `paths:` block, add `method: sft`:
+```yaml
+# REMOVE: paths: {train_data, test_data, logs_dir}
+# ADD: method field for the new dispatcher
+method: sft
+training:
+  iters: 2000
+  batch_size: 4
+  learning_rate: 1e-5
+  steps_per_eval: 50
+  grad_checkpoint: true
+optimizer:
+  type: "adam"
+metrics:
+  patience: 5
+  min_delta: 0.001
+```
+
+**`config/evaluation_config.yaml`** — remove `paths:` block, keep evaluation settings:
+```yaml
+# REMOVE: paths: {results_dir, test_data}
+# These are workspace-managed: workspaces/{domain}/logs/evaluation/, etc.
+evaluation:
+  method: "simple"
+  max_tokens: 200
+  temperature: 0.7
+metrics:
+  bertscore:
+    model_type: "microsoft/deberta-xlarge-mnli"
+    lang: "en"
+  simple:
+    word_overlap_threshold: 0.5
+comparison:
+  compare_with_base: true
+  score_thresholds:
+    excellent: 0.9
+    good: 0.7
+    acceptable: 0.5
+    poor: 0.3
+```
+
+**`config/defaults.yaml`** — **keep untouched**. This is the current ElixirLoRA synthetic pipeline config (teacher model, bootstrap, generate, filter settings). It is not from the old project.
+
+---
+
 ## Out of scope
 
 - Data preparation logic changes (only entry point moves from `scripts/` to `commands/`)
@@ -254,3 +333,4 @@ DPO requires `{"prompt": str, "chosen": str, "rejected": str}` triples. GRPO req
 - TUI panel logic
 - `src/inference/`, `src/data/`
 - DPO and GRPO data preparation pipelines
+- `README.md` update (separate task)
