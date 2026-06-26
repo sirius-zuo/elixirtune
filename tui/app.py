@@ -52,6 +52,9 @@ class ElixirLoRAApp(App):
                 yield EvaluationPanel(id="panel-eval")
             with TabPane("Deploy", id="tab-deploy"):
                 yield DeploymentPanel(id="panel-deploy")
+            with TabPane("Chat", id="tab-chat"):
+                from tui.panels.chat import ChatPanel  # local import avoids circular dep
+                yield ChatPanel(id="panel-chat")
 
     def on_mount(self) -> None:
         self._rescan()
