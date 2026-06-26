@@ -62,7 +62,7 @@ async def test_upload_modal_validation_empty_token():
 
 def test_upload_cli_missing_fused(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    result = runner.invoke(cli.app, ["upload", "d", "--repo-name", "u/r", "--token", "tok"])
+    result = runner.invoke(cli.app, ["upload", "upload", "d", "--repo-name", "u/r", "--token", "tok"])
     assert result.exit_code == 1
     assert "fused" in result.output.lower()
 
@@ -73,7 +73,7 @@ def test_upload_cli_missing_token(tmp_path, monkeypatch):
     ws.mkdir(parents=True)
     (ws / "model.safetensors").write_text("x")
     monkeypatch.delenv("HF_TOKEN", raising=False)
-    result = runner.invoke(cli.app, ["upload", "d", "--repo-name", "u/r"])
+    result = runner.invoke(cli.app, ["upload", "upload", "d", "--repo-name", "u/r"])
     assert result.exit_code == 1
     assert "token" in result.output.lower()
 
@@ -85,7 +85,7 @@ def test_upload_cli_success(tmp_path, monkeypatch):
     (ws / "model.safetensors").write_text("x")
     with patch("huggingface_hub.create_repo") as mock_create, \
          patch("huggingface_hub.upload_folder") as mock_upload:
-        result = runner.invoke(cli.app, ["upload", "d", "--repo-name", "u/r", "--token", "tok"])
+        result = runner.invoke(cli.app, ["upload", "upload", "d", "--repo-name", "u/r", "--token", "tok"])
     assert result.exit_code == 0
     mock_create.assert_called_once()
     mock_upload.assert_called_once()
