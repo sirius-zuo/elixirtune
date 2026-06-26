@@ -16,7 +16,7 @@ def write_jsonl(path, records: list[dict]) -> None:
 def append_jsonl(path, records: list[dict]) -> None:
     p = Path(path)
     p.parent.mkdir(parents=True, exist_ok=True)
-    with p.open("a") as f:
+    with p.open("a", encoding="utf-8") as f:
         for r in records:
             f.write(json.dumps(r, ensure_ascii=False) + "\n")
 
