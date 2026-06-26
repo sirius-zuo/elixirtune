@@ -2,6 +2,7 @@ import json
 import pytest
 from pathlib import Path
 from textual.app import App, ComposeResult
+from textual.widgets import Button
 from tui.app import BasePanel
 from tui.panels.overview import OverviewPanel
 
@@ -91,3 +92,50 @@ async def test_prepare_button_enabled_with_generated(tmp_path):
         from textual.widgets import Button
         btn = pilot.app.query_one("#prepare-btn", Button)
         assert not btn.disabled
+
+
+from tui.panels.training import TrainingPanel
+
+
+class TrainApp(App):
+    def __init__(self, ws: Path):
+        super().__init__()
+        self._ws = ws
+
+    def compose(self) -> ComposeResult:
+        yield TrainingPanel(id="panel")
+
+    def on_mount(self) -> None:
+        self.query_one(TrainingPanel).domain = self._ws.name
+
+
+async def test_train_button_disabled_without_prepared_data(tmp_path):
+    ws = tmp_path / "workspaces" / "d"
+    ws.mkdir(parents=True)
+    import os; os.chdir(tmp_path)
+    async with TrainApp(ws).run_test() as pilot:
+        await pilot.pause()
+        assert pilot.app.query_one("#train-btn", Button).disabled
+
+
+async def test_train_button_enabled_with_prepared_data(tmp_path):
+    ws = tmp_path / "workspaces" / "d"
+    (ws / "processed").mkdir(parents=True)
+    (ws / "processed" / "train.json").write_text("[]")
+    import os; os.chdir(tmp_path)
+    async with TrainApp(ws).run_test() as pilot:
+        await pilot.pause()
+        assert not pilot.app.query_one("#train-btn", Button).disabled
+
+
+async def test_training_panel_shows_sparkline_after_run(tmp_path):
+    ws = tmp_path / "workspaces" / "d"
+    (ws / "logs" / "training").mkdir(parents=True)
+    import json
+    metrics = {"train_loss": [2.0, 1.5, 1.0], "val_loss": [2.1, 1.6, 1.1], "iterations": [100, 200, 300]}
+    (ws / "logs" / "training" / "training_metrics.json").write_text(json.dumps(metrics))
+    import os; os.chdir(tmp_path)
+    async with TrainApp(ws).run_test() as pilot:
+        await pilot.pause()
+        from textual.widgets import Sparkline
+        assert pilot.app.query_one(Sparkline) is not None
