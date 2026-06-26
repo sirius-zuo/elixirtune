@@ -45,12 +45,15 @@ class DeploymentPanel(BasePanel):
         self.query_one("#fused-info", Label).update(
             f"workspaces/{self.domain}/fused       {_dir_size_mb(fused_dir)}"
         )
-        status_idx = list(Status).index(status)
-        trained_idx = list(Status).index(Status.TRAINED)
-        deployed_idx = list(Status).index(Status.DEPLOYED)
-        self.query_one("#fuse-btn", Button).disabled = status_idx < trained_idx
-        self.query_one("#ollama-btn", Button).disabled = status_idx < deployed_idx
-        self.query_one("#hf-upload-btn", Button).disabled = status_idx < deployed_idx
+        self.query_one("#fuse-btn", Button).disabled = (
+            status_order(status) < status_order(Status.TRAINED)
+        )
+        self.query_one("#ollama-btn", Button).disabled = (
+            status_order(status) < status_order(Status.DEPLOYED)
+        )
+        self.query_one("#hf-upload-btn", Button).disabled = (
+            status_order(status) < status_order(Status.DEPLOYED)
+        )
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if not self.domain:
