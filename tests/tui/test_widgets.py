@@ -53,8 +53,6 @@ async def test_config_form_save_writes_yaml(tmp_path, monkeypatch):
 
     async with CfgApp(fields, domain="d").run_test() as pilot:
         pilot.app.query_one("#cfg-model").value = "new-model"
-        saved_events = []
-        pilot.app.query_one(ConfigForm).on(ConfigForm.Saved, lambda e: saved_events.append(e))
         await pilot.click("#cfg-save")
         await pilot.pause()
 
