@@ -5,14 +5,16 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 import typer
 from data.synthetic.io import read_jsonl, write_jsonl
 
-app = typer.Typer()
+app = typer.Typer(context_settings={"allow_interspersed_args": True})
 
 def _ws(domain: str) -> Path:
     return Path("workspaces") / domain
 
-@app.command()
-def init(domain: str, desc: str = typer.Option(None), seeds: str = typer.Option(None)):
+@app.callback(invoke_without_command=True)
+def init(ctx: typer.Context, domain: str = typer.Argument(...), desc: str = typer.Option(None), seeds: str = typer.Option(None)):
     """Initialise a new domain workspace."""
+    if ctx.invoked_subcommand is not None:
+        return
     cand = _ws(domain) / "seeds" / "candidates.jsonl"
     cand.parent.mkdir(parents=True, exist_ok=True)
     if seeds:

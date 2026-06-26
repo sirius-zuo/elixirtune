@@ -6,14 +6,16 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 import typer
 from data.synthetic.io import read_jsonl
 
-app = typer.Typer()
+app = typer.Typer(context_settings={"allow_interspersed_args": True})
 
 def _ws(domain: str) -> Path:
     return Path("workspaces") / domain
 
-@app.command()
-def curate(domain: str):
+@app.callback(invoke_without_command=True)
+def curate(ctx: typer.Context, domain: str = typer.Argument(...)):
     """Curate seed examples for a domain."""
+    if ctx.invoked_subcommand is not None:
+        return
     cand = _ws(domain) / "seeds" / "candidates.jsonl"
     approved = _ws(domain) / "seeds" / "approved.jsonl"
     shutil.copyfile(cand, approved)

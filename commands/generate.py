@@ -9,14 +9,16 @@ from data.synthetic.embedder import SentenceTransformerEmbedder
 from data.synthetic.pipeline import run_generate
 from data.synthetic.io import read_jsonl
 
-app = typer.Typer()
+app = typer.Typer(context_settings={"allow_interspersed_args": True})
 
 def _ws(domain: str) -> Path:
     return Path("workspaces") / domain
 
-@app.command()
-def generate(domain: str):
+@app.callback(invoke_without_command=True)
+def generate(ctx: typer.Context, domain: str = typer.Argument(...)):
     """Generate and filter synthetic training data."""
+    if ctx.invoked_subcommand is not None:
+        return
     cfg = load_config(_ws(domain) / "config.yaml")
     teacher = from_config(cfg)
     embedder = SentenceTransformerEmbedder()

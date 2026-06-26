@@ -4,19 +4,22 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 import typer
 
-app = typer.Typer()
+app = typer.Typer(context_settings={"allow_interspersed_args": True})
 
 def _ws(domain: str) -> Path:
     return Path("workspaces") / domain
 
-@app.command()
+@app.callback(invoke_without_command=True)
 def upload(
-    domain: str,
+    ctx: typer.Context,
+    domain: str = typer.Argument(...),
     repo_name: str = typer.Option(..., help="HuggingFace repo (username/repo-name)"),
     private: bool = typer.Option(False, help="Make repository private"),
     token: str = typer.Option(None, envvar="HF_TOKEN", help="HuggingFace token"),
 ):
     """Upload fused model to HuggingFace Hub."""
+    if ctx.invoked_subcommand is not None:
+        return
     import huggingface_hub
 
     fused = _ws(domain) / "fused"
