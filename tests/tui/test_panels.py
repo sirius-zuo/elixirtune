@@ -139,3 +139,54 @@ async def test_training_panel_shows_sparkline_after_run(tmp_path):
         await pilot.pause()
         from textual.widgets import Sparkline
         assert pilot.app.query_one(Sparkline) is not None
+
+
+from tui.panels.evaluation import EvaluationPanel
+
+
+class EvalApp(App):
+    def __init__(self, ws: Path):
+        super().__init__()
+        self._ws = ws
+
+    def compose(self) -> ComposeResult:
+        yield EvaluationPanel(id="panel")
+
+    def on_mount(self) -> None:
+        self.query_one(EvaluationPanel).domain = self._ws.name
+
+
+async def test_eval_buttons_disabled_without_adapters(tmp_path):
+    ws = tmp_path / "workspaces" / "d"
+    ws.mkdir(parents=True)
+    import os; os.chdir(tmp_path)
+    async with EvalApp(ws).run_test() as pilot:
+        await pilot.pause()
+        assert pilot.app.query_one("#eval-btn", Button).disabled
+        assert pilot.app.query_one("#fuse-eval-btn", Button).disabled
+
+
+async def test_eval_buttons_enabled_with_adapters(tmp_path):
+    ws = tmp_path / "workspaces" / "d"
+    (ws / "adapters").mkdir(parents=True)
+    (ws / "adapters" / "weights.npz").write_text("x")
+    import os; os.chdir(tmp_path)
+    async with EvalApp(ws).run_test() as pilot:
+        await pilot.pause()
+        assert not pilot.app.query_one("#eval-btn", Button).disabled
+
+
+async def test_eval_results_table_loaded_from_json(tmp_path):
+    ws = tmp_path / "workspaces" / "d"
+    (ws / "logs" / "evaluation").mkdir(parents=True)
+    import json
+    (ws / "logs" / "evaluation" / "base_model_evaluation.json").write_text(json.dumps({
+        "model_name": "base_model",
+        "metrics": {"word_overlap": {"mean": 0.31}, "bertscore": None},
+    }))
+    import os; os.chdir(tmp_path)
+    async with EvalApp(ws).run_test() as pilot:
+        await pilot.pause()
+        from textual.widgets import DataTable
+        table = pilot.app.query_one(DataTable)
+        assert table.row_count >= 1
