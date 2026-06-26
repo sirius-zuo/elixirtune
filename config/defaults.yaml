@@ -9,6 +9,7 @@ generate:
   target_size: 2000
   fewshot_k: 4
   cot: true
+  max_miss_factor: 5
 refine:
   passes: []
   self_refine: {model: qwen3.6}
@@ -17,4 +18,4 @@ filter:
   schema: {max_tokens: 2048}
   dedup: {embedding_model: all-MiniLM-L6-v2, similarity_threshold: 0.92}
   judge: {model: qwen3.6, score_cutoff: 4}
-  diversity: {quotas: {bug: 0.4, style: 0.3, perf: 0.3}}
+  diversity: {quotas: {bug: 1.0}}

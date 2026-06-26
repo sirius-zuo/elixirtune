@@ -26,7 +26,7 @@ def run_generate(domain, cfg, teacher, embedder, root=Path("."), now=None) -> Pa
     raw_path = ws / "generated" / "raw.jsonl"
     have = len(read_jsonl(raw_path))                      # resume support
     misses = 0
-    while have < gcfg["target_size"] and misses < gcfg["target_size"] * 5:
+    while have < gcfg["target_size"] and misses < gcfg["target_size"] * gcfg.get("max_miss_factor", 5):
         try:
             rec = gen_mod.generate_one(seeds, teacher, gcfg["fewshot_k"], gcfg["cot"])
         except gen_mod.GenerationMiss:
