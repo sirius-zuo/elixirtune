@@ -25,3 +25,22 @@ async def test_app_switching_domain_sets_panel_domain(tmp_path):
         from tui.app import BasePanel
         panels = list(pilot.app.query(BasePanel))
         assert all(p.domain == "d1" for p in panels)
+
+
+async def test_new_domain_button_opens_modal(tmp_path):
+    async with ElixirLoRAApp(root=tmp_path).run_test() as pilot:
+        await pilot.click("#new-domain-btn")
+        await pilot.pause()
+        from textual.widgets import Input
+        # Modal is on screen — domain name input should be visible
+        assert pilot.app.query_one("#new-domain-name", Input) is not None
+
+
+async def test_new_domain_cancel_closes_modal(tmp_path):
+    async with ElixirLoRAApp(root=tmp_path).run_test() as pilot:
+        await pilot.click("#new-domain-btn")
+        await pilot.pause()
+        await pilot.click("#new-domain-cancel")
+        await pilot.pause()
+        from tui.new_domain import NewDomainScreen
+        assert not any(isinstance(s, NewDomainScreen) for s in pilot.app.screen_stack)
