@@ -11,10 +11,10 @@ class HFUploadScreen(ModalScreen):
     HFUploadScreen > * {
         width: 62; background: $surface; border: solid $primary; padding: 0 2;
     }
-    Label { height: 1; }
-    Input { height: 1; }
-    Checkbox { height: 1; }
-    Button { height: 1; }
+    HFUploadScreen Label { height: 1; }
+    HFUploadScreen Input { height: 1; }
+    HFUploadScreen Checkbox { height: 1; }
+    HFUploadScreen Button { height: 1; }
     #hf-error { color: red; height: 1; }
     """
 

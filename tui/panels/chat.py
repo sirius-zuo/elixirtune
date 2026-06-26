@@ -122,6 +122,7 @@ class ChatPanel(BasePanel):
                 return
         prompt = self._format_prompt(message)
         self.post_message(AssistantStart())
+        exit_code = 0
         try:
             for response in mlx_lm.stream_generate(
                 self._model, self._tokenizer, prompt, max_tokens=512
@@ -129,7 +130,8 @@ class ChatPanel(BasePanel):
                 self.post_message(TokenOutput(response.text))
         except Exception as e:
             self.post_message(TokenOutput(f"\n[red]Error: {e}[/red]"))
-        self.post_message(RunnerDone(0))
+            exit_code = 1
+        self.post_message(RunnerDone(exit_code))
 
     def on_assistant_start(self, _: AssistantStart) -> None:
         self.query_one("#chat-log", RichLog).write(
