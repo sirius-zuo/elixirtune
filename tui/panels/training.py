@@ -50,8 +50,17 @@ class TrainingPanel(BasePanel):
     def _load_sparkline(self, ws: Path) -> None:
         metrics_file = ws / "logs" / "training" / "training_metrics.json"
         if metrics_file.exists():
-            metrics = json.loads(metrics_file.read_text())
-            self.query_one(Sparkline).data = metrics.get("train_loss", [])
+            try:
+                metrics = json.loads(metrics_file.read_text())
+                self.query_one(Sparkline).data = metrics.get("train_loss", [])
+            except (json.JSONDecodeError, OSError):
+                pass
+
+    def watch_domain(self, domain: str | None) -> None:
+        if self._poll_timer is not None:
+            self._poll_timer.stop()
+            self._poll_timer = None
+        super().watch_domain(domain)
 
     def _poll_metrics(self) -> None:
         if not self.domain:
@@ -60,7 +69,10 @@ class TrainingPanel(BasePanel):
         metrics_file = ws / "logs" / "training" / "training_metrics.json"
         if not metrics_file.exists():
             return
-        metrics = json.loads(metrics_file.read_text())
+        try:
+            metrics = json.loads(metrics_file.read_text())
+        except (json.JSONDecodeError, OSError):
+            return
         train_loss = metrics.get("train_loss", [])
         val_loss = metrics.get("val_loss", [])
         iters = metrics.get("iterations", [])
@@ -108,7 +120,6 @@ class TrainingPanel(BasePanel):
             self._poll_timer.stop()
             self._poll_timer = None
         self._poll_metrics()
-        self.query_one("#train-progress", Label).update("")
         self.query_one("#train-btn", Button).disabled = False
         if event.exit_code != 0:
             self.query_one(LogView).write_line(

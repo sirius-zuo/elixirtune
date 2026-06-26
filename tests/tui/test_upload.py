@@ -87,5 +87,16 @@ def test_upload_cli_success(tmp_path, monkeypatch):
          patch("huggingface_hub.upload_folder") as mock_upload:
         result = runner.invoke(cli.app, ["upload", "d", "--repo-name", "u/r", "--token", "tok"])
     assert result.exit_code == 0
+    mock_create.assert_called_once()
     mock_upload.assert_called_once()
     assert "u/r" in result.output
+
+
+async def test_upload_modal_validation_empty_side_of_slash():
+    async with ModalApp().run_test() as pilot:
+        pilot.app.screen.query_one("#hf-repo-name", Input).value = "user/"
+        pilot.app.screen.query_one("#hf-token", Input).value = "tok"
+        await pilot.click("#hf-upload-confirm")
+        await pilot.pause()
+        label = pilot.app.screen.query_one("#hf-error", Label)
+        assert "username/repo" in str(label.content).lower()

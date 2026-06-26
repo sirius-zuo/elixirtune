@@ -72,19 +72,21 @@ class ChatPanel(BasePanel):
         self._model = None
         self._tokenizer = None
 
-    def _system_prompt(self) -> str:
-        if not self.domain:
-            return "You are a helpful assistant."
-        cfg_path = Path("workspaces") / self.domain / "config.yaml"
+    def _system_prompt(self, domain: str) -> str:
+        cfg_path = Path("workspaces") / domain / "config.yaml"
         if cfg_path.exists():
-            data = yaml.safe_load(cfg_path.read_text()) or {}
-            sp = data.get("chat", {}).get("system_prompt")
-            if sp:
-                return sp
+            try:
+                data = yaml.safe_load(cfg_path.read_text()) or {}
+                if isinstance(data, dict):
+                    sp = data.get("chat", {}).get("system_prompt")
+                    if sp:
+                        return sp
+            except Exception:
+                pass
         return "You are a helpful assistant."
 
-    def _format_prompt(self, message: str) -> str:
-        system = self._system_prompt()
+    def _format_prompt(self, message: str, domain: str) -> str:
+        system = self._system_prompt(domain)
         return f"<|system|>\n{system}<|end|>\n<|user|>\n{message}<|end|>\n<|assistant|>"
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
@@ -96,6 +98,8 @@ class ChatPanel(BasePanel):
             self._send()
 
     def _send(self) -> None:
+        if self.query_one("#chat-send", Button).disabled:
+            return
         inp = self.query_one("#chat-input", Input)
         message = inp.value.strip()
         if not message:
@@ -107,12 +111,12 @@ class ChatPanel(BasePanel):
         self.query_one("#chat-send", Button).disabled = True
         status = "Loading model…" if self._model is None else "Generating…"
         self.query_one("#chat-status", Label).update(status)
-        self._send_message(message)
+        self._send_message(message, self.domain)
 
     @work(thread=True)
-    def _send_message(self, message: str) -> None:
+    def _send_message(self, message: str, domain: str) -> None:
         import mlx_lm
-        ws = Path("workspaces") / self.domain
+        ws = Path("workspaces") / domain
         if self._model is None:
             try:
                 self._model, self._tokenizer = mlx_lm.load(str(ws / "fused"))
@@ -120,7 +124,7 @@ class ChatPanel(BasePanel):
                 self.post_message(TokenOutput(f"\n[red]Failed to load model: {e}[/red]"))
                 self.post_message(RunnerDone(1))
                 return
-        prompt = self._format_prompt(message)
+        prompt = self._format_prompt(message, domain)
         self.post_message(AssistantStart())
         exit_code = 0
         try:
@@ -144,8 +148,18 @@ class ChatPanel(BasePanel):
 
     def on_runner_done(self, event: RunnerDone) -> None:
         self.query_one("#chat-log", RichLog).write("\n")
-        self.query_one("#chat-send", Button).disabled = False
         if event.exit_code != 0:
             self.query_one("#chat-status", Label).update("Error — see log above")
         else:
-            self.query_one("#chat-status", Label).update("Ready")
+            # Re-enable Send only if domain is still valid and has a fused model
+            if self.domain:
+                ws = Path("workspaces") / self.domain
+                fused = ws / "fused"
+                if fused.exists() and any(fused.iterdir()):
+                    self.query_one("#chat-send", Button).disabled = False
+                    self.query_one("#chat-status", Label).update("Ready")
+                    return
+            # Domain changed or no fused model — keep Send disabled
+            self.query_one("#chat-status", Label).update(
+                "No fused model — run Deployment › Fuse first"
+            )

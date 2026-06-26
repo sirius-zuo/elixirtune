@@ -75,12 +75,12 @@ async def test_chat_domain_switch_clears_log(tmp_path):
     async with ChatApp(ws).run_test() as pilot:
         await pilot.pause()
         log = pilot.app.query_one("#chat-log", RichLog)
-        # Manually write something, then switch domain
         log.write("some old message")
         panel = pilot.app.query_one(ChatPanel)
         panel.domain = None
         await pilot.pause()
-        # Log should be cleared; Send button should be disabled
+        # Log should be cleared and Send disabled
+        assert not log.lines
         assert pilot.app.query_one("#chat-send", Button).disabled
 
 
@@ -93,16 +93,12 @@ async def test_chat_token_streaming(tmp_path):
     mock_resp = MagicMock()
     mock_resp.text = "hello"
 
-    import mlx_lm
-    mlx_lm.load = MagicMock(return_value=(MagicMock(), MagicMock()))
-    mlx_lm.stream_generate = MagicMock(return_value=iter([mock_resp]))
-
-    async with ChatApp(ws).run_test() as pilot:
-        await pilot.pause()
-        pilot.app.query_one("#chat-input", Input).value = "hi"
-        await pilot.click("#chat-send")
-        await pilot.pause(delay=1.0)
-        log = pilot.app.query_one("#chat-log", RichLog)
-        assert log is not None
-        # Send should be re-enabled after worker completes
-        assert not pilot.app.query_one("#chat-send", Button).disabled
+    with patch("mlx_lm.load", return_value=(MagicMock(), MagicMock())), \
+         patch("mlx_lm.stream_generate", return_value=iter([mock_resp])):
+        async with ChatApp(ws).run_test() as pilot:
+            await pilot.pause()
+            pilot.app.query_one("#chat-input", Input).value = "hi"
+            await pilot.click("#chat-send")
+            await pilot.pause(delay=1.0)
+            # Send should be re-enabled after worker completes (proves streaming ran)
+            assert not pilot.app.query_one("#chat-send", Button).disabled

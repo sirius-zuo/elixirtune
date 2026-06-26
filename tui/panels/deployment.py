@@ -60,22 +60,23 @@ class DeploymentPanel(BasePanel):
             return
         event.stop()
         ws = Path("workspaces") / self.domain
-        generate_runtime_configs(ws)
         if event.button.id == "fuse-btn":
+            generate_runtime_configs(ws)
             event.button.disabled = True
             self._run_fuse(self.domain)
         elif event.button.id == "ollama-btn":
+            generate_runtime_configs(ws)
             event.button.disabled = True
             self._run_ollama(self.domain)
         elif event.button.id == "hf-upload-btn":
             from tui.upload_modal import HFUploadScreen
-            self.app.push_screen(HFUploadScreen(), callback=self._on_upload_result)
-
-    def _on_upload_result(self, result) -> None:
-        if result is None:
-            return
-        self.query_one("#hf-upload-btn", Button).disabled = True
-        self._run_upload(self.domain, result["repo"], result["private"], result["token"])
+            captured_domain = self.domain
+            def _on_upload_result(result) -> None:
+                if result is None:
+                    return
+                self.query_one("#hf-upload-btn", Button).disabled = True
+                self._run_upload(captured_domain, result["repo"], result["private"], result["token"])
+            self.app.push_screen(HFUploadScreen(), callback=_on_upload_result)
 
     @work(thread=True)
     def _run_fuse(self, domain: str) -> None:
@@ -133,8 +134,6 @@ class DeploymentPanel(BasePanel):
         self.query_one(LogView).write_line(event.line)
 
     def on_runner_done(self, event: RunnerDone) -> None:
-        self.query_one("#fuse-btn", Button).disabled = False
-        self.query_one("#hf-upload-btn", Button).disabled = False
         if event.exit_code != 0:
             self.query_one(LogView).write_line(
                 f"[red]Failed (exit {event.exit_code})[/red]"

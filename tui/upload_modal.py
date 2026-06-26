@@ -50,7 +50,8 @@ class HFUploadScreen(ModalScreen):
         if not repo:
             error_label.update("Repository name is required.")
             return
-        if "/" not in repo:
+        parts = repo.split("/")
+        if len(parts) != 2 or not parts[0] or not parts[1]:
             error_label.update("Must be in format: username/repo-name.")
             return
         if not token:
