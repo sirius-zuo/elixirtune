@@ -55,6 +55,15 @@ def generate(domain: str):
 
 
 @app.command()
+def tui(domain: str = typer.Option(None, help="Domain to pre-select on launch")):
+    """Launch the TUI dashboard."""
+    import sys
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from tui.app import ElixirLoRAApp
+    ElixirLoRAApp(initial_domain=domain).run()
+
+
+@app.command()
 def prepare(domain: str, system_prompt: str = typer.Option(..., help="System prompt for the fine-tuned model")):
     """Convert filtered JSONL from generate into train/val/test splits for the training pipeline."""
     filtered = _ws(domain) / "generated" / "filtered.jsonl"
