@@ -23,24 +23,6 @@ class NewDomainRequested(Message):
     pass
 
 
-class DomainLabel(Label):
-    """A Label that can post DomainSelected when clicked."""
-
-    def __init__(self, text: str, domain_name: str, **kwargs):
-        super().__init__(text, **kwargs)
-        self.domain_name = domain_name
-
-    def on_click(self, event: Click) -> None:
-        """Handle click and post DomainSelected message."""
-        # Find the Sidebar ancestor and post the message
-        parent = self.parent
-        while parent:
-            if isinstance(parent, Sidebar):
-                parent.post_message(DomainSelected(self.domain_name))
-                break
-            parent = parent.parent
-
-
 class Sidebar(Widget):
     DEFAULT_CSS = """
     Sidebar { width: 22; dock: left; border-right: solid $primary; }
@@ -59,8 +41,7 @@ class Sidebar(Widget):
         lv.clear()
         for d in domains:
             dot = _DOT[d.status]
-            label = DomainLabel(f"{dot} {d.name}", domain_name=d.name)
-            lv.append(ListItem(label, id=f"domain-{d.name}"))
+            lv.append(ListItem(Label(f"{dot} {d.name}"), id=f"domain-{d.name}"))
 
     def on_list_view_selected(self, event: ListView.Selected) -> None:
         if event.item.id and event.item.id.startswith("domain-"):
