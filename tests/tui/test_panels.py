@@ -277,3 +277,37 @@ async def test_generate_button_enabled_at_prepared_state(tmp_path):
     async with SynthApp(ws).run_test() as pilot:
         await pilot.pause()
         assert not pilot.app.query_one("#gen-btn", Button).disabled
+
+
+# ── Deployment upload tests ──────────────────────────────────────────────────
+
+async def test_hf_upload_button_disabled_without_fused(tmp_path):
+    ws = tmp_path / "workspaces" / "d"
+    ws.mkdir(parents=True)
+    import os; os.chdir(tmp_path)
+    async with DeployApp(ws).run_test() as pilot:
+        await pilot.pause()
+        assert pilot.app.query_one("#hf-upload-btn", Button).disabled
+
+
+async def test_hf_upload_button_enabled_with_fused(tmp_path):
+    ws = tmp_path / "workspaces" / "d"
+    (ws / "fused").mkdir(parents=True)
+    (ws / "fused" / "model.safetensors").write_text("x")
+    import os; os.chdir(tmp_path)
+    async with DeployApp(ws).run_test() as pilot:
+        await pilot.pause()
+        assert not pilot.app.query_one("#hf-upload-btn", Button).disabled
+
+
+async def test_hf_upload_button_click_opens_modal(tmp_path):
+    ws = tmp_path / "workspaces" / "d"
+    (ws / "fused").mkdir(parents=True)
+    (ws / "fused" / "model.safetensors").write_text("x")
+    import os; os.chdir(tmp_path)
+    async with DeployApp(ws).run_test() as pilot:
+        await pilot.pause()
+        await pilot.click("#hf-upload-btn")
+        await pilot.pause()
+        from tui.upload_modal import HFUploadScreen
+        assert any(isinstance(s, HFUploadScreen) for s in pilot.app.screen_stack)

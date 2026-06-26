@@ -1,3 +1,4 @@
+# tui/panels/deployment.py
 import subprocess
 from pathlib import Path
 
@@ -6,7 +7,7 @@ from textual.widgets import Button, Label, Rule
 from textual import work
 
 from tui.app import BasePanel
-from tui.domain import infer_status, Status, generate_runtime_configs
+from tui.domain import infer_status, Status, generate_runtime_configs, status_order
 from tui.runner import RunnerOutput, RunnerDone
 from tui.widgets.log_view import LogView
 
@@ -27,6 +28,7 @@ class DeploymentPanel(BasePanel):
         yield Rule()
         yield Button("▶ Fuse & Evaluate", id="fuse-btn", disabled=True, variant="success")
         yield Button("Create Ollama Model", id="ollama-btn", disabled=True)
+        yield Button("Upload to HuggingFace", id="hf-upload-btn", disabled=True)
         yield Rule()
         yield LogView(id="deploy-log")
 
@@ -44,8 +46,11 @@ class DeploymentPanel(BasePanel):
             f"workspaces/{self.domain}/fused       {_dir_size_mb(fused_dir)}"
         )
         status_idx = list(Status).index(status)
-        self.query_one("#fuse-btn", Button).disabled = status_idx < list(Status).index(Status.TRAINED)
-        self.query_one("#ollama-btn", Button).disabled = status_idx < list(Status).index(Status.DEPLOYED)
+        trained_idx = list(Status).index(Status.TRAINED)
+        deployed_idx = list(Status).index(Status.DEPLOYED)
+        self.query_one("#fuse-btn", Button).disabled = status_idx < trained_idx
+        self.query_one("#ollama-btn", Button).disabled = status_idx < deployed_idx
+        self.query_one("#hf-upload-btn", Button).disabled = status_idx < deployed_idx
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if not self.domain:
@@ -59,6 +64,15 @@ class DeploymentPanel(BasePanel):
         elif event.button.id == "ollama-btn":
             event.button.disabled = True
             self._run_ollama(self.domain)
+        elif event.button.id == "hf-upload-btn":
+            from tui.upload_modal import HFUploadScreen
+            self.app.push_screen(HFUploadScreen(), callback=self._on_upload_result)
+
+    def _on_upload_result(self, result) -> None:
+        if result is None:
+            return
+        self.query_one("#hf-upload-btn", Button).disabled = True
+        self._run_upload(self.domain, result["repo"], result["private"], result["token"])
 
     @work(thread=True)
     def _run_fuse(self, domain: str) -> None:
@@ -81,6 +95,28 @@ class DeploymentPanel(BasePanel):
         cmd = ["ollama", "create", f"{domain}-lora", "-f", str(modelfile)]
         self._stream(cmd)
 
+    @work(thread=True)
+    def _run_upload(self, domain: str, repo: str, private: bool, token: str) -> None:
+        import huggingface_hub
+        ws = Path("workspaces") / domain
+        try:
+            self.post_message(RunnerOutput(f"Creating repository {repo}…"))
+            huggingface_hub.create_repo(
+                repo_id=repo, private=private, token=token, exist_ok=True, repo_type="model"
+            )
+            self.post_message(RunnerOutput(f"Uploading {ws / 'fused'}…"))
+            huggingface_hub.upload_folder(
+                folder_path=str(ws / "fused"),
+                repo_id=repo,
+                token=token,
+                commit_message=f"Upload fused model for domain: {domain}",
+            )
+            self.post_message(RunnerOutput(f"Done. https://huggingface.co/{repo}"))
+            self.post_message(RunnerDone(0))
+        except Exception as e:
+            self.post_message(RunnerOutput(f"[red]Upload failed: {e}[/red]"))
+            self.post_message(RunnerDone(1))
+
     def _stream(self, cmd: list[str]) -> None:
         proc = subprocess.Popen(
             cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
@@ -95,6 +131,7 @@ class DeploymentPanel(BasePanel):
 
     def on_runner_done(self, event: RunnerDone) -> None:
         self.query_one("#fuse-btn", Button).disabled = False
+        self.query_one("#hf-upload-btn", Button).disabled = False
         if event.exit_code != 0:
             self.query_one(LogView).write_line(
                 f"[red]Failed (exit {event.exit_code})[/red]"
