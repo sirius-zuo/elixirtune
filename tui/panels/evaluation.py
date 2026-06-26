@@ -7,7 +7,7 @@ from textual.widgets import Button, DataTable, Rule
 from textual import work
 
 from tui.app import BasePanel
-from tui.domain import infer_status, Status, generate_runtime_configs
+from tui.domain import infer_status, Status, generate_runtime_configs, status_order
 from tui.runner import RunnerOutput, RunnerDone
 from tui.widgets.log_view import LogView
 
@@ -30,8 +30,8 @@ class EvaluationPanel(BasePanel):
             return
         ws = Path("workspaces") / self.domain
         status = infer_status(ws)
-        self.query_one("#eval-btn", Button).disabled = status < Status.TRAINED
-        self.query_one("#fuse-eval-btn", Button).disabled = status < Status.TRAINED
+        self.query_one("#eval-btn", Button).disabled = status_order(status) < status_order(Status.TRAINED)
+        self.query_one("#fuse-eval-btn", Button).disabled = status_order(status) < status_order(Status.TRAINED)
         self._load_results(ws)
 
     def _load_results(self, ws: Path) -> None:

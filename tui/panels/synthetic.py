@@ -6,7 +6,7 @@ from textual.widgets import Button, Label, Rule
 from textual import work
 
 from tui.app import BasePanel
-from tui.domain import infer_status, Status
+from tui.domain import infer_status, Status, status_order
 from tui.runner import RunnerOutput, RunnerDone
 from tui.widgets.config_form import ConfigField, ConfigForm
 from tui.widgets.log_view import LogView
@@ -40,9 +40,9 @@ class SyntheticPanel(BasePanel):
         ws = Path("workspaces") / self.domain
         status = infer_status(ws)
         self.query_one("#init-btn", Button).disabled = False
-        self.query_one("#curate-btn", Button).disabled = status < Status.EMPTY
-        self.query_one("#gen-btn", Button).disabled = status < Status.SEEDED
-        self.query_one("#prepare-btn", Button).disabled = status < Status.GENERATED
+        self.query_one("#curate-btn", Button).disabled = status_order(status) < status_order(Status.EMPTY)
+        self.query_one("#gen-btn", Button).disabled = status_order(status) < status_order(Status.SEEDED)
+        self.query_one("#prepare-btn", Button).disabled = status_order(status) < status_order(Status.GENERATED)
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if not self.domain:

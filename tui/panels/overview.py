@@ -70,6 +70,12 @@ class OverviewPanel(BasePanel):
              "--config", str(ws / "runtime_eval_config.yaml"),
              "--adapters-path", str(ws / "adapters"),
              "--test-data", str(ws / "processed" / "test.json")],
+            ["python3", "scripts/04_fuse_and_evaluate.py",
+             "--model-config", str(ws / "runtime_model_config.yaml"),
+             "--eval-config", str(ws / "runtime_eval_config.yaml"),
+             "--test-data", str(ws / "processed" / "test.json"),
+             "--adapters-path", str(ws / "adapters"),
+             "--output-path", str(ws / "fused")],
         ]
         for cmd in steps:
             proc = subprocess.Popen(

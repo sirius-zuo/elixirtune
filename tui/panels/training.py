@@ -7,7 +7,7 @@ from textual.widgets import Button, Label, Rule, Sparkline
 from textual import work
 
 from tui.app import BasePanel
-from tui.domain import infer_status, Status, generate_runtime_configs
+from tui.domain import infer_status, Status, generate_runtime_configs, status_order
 from tui.runner import RunnerOutput, RunnerDone
 from tui.widgets.config_form import ConfigField, ConfigForm
 from tui.widgets.log_view import LogView
@@ -36,7 +36,7 @@ class TrainingPanel(BasePanel):
             return
         ws = Path("workspaces") / self.domain
         status = infer_status(ws)
-        self.query_one("#train-btn", Button).disabled = status < Status.PREPARED
+        self.query_one("#train-btn", Button).disabled = status_order(status) < status_order(Status.PREPARED)
         self._load_sparkline(ws)
 
     def _load_sparkline(self, ws: Path) -> None:

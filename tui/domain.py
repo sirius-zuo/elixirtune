@@ -15,6 +15,13 @@ class Status(str, Enum):
     DEPLOYED = "deployed"
 
 
+_STATUS_ORDER = list(Status)
+
+
+def status_order(s: Status) -> int:
+    return _STATUS_ORDER.index(s)
+
+
 @dataclass
 class DomainState:
     name: str

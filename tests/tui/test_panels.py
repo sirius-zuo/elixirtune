@@ -236,3 +236,44 @@ async def test_deployment_shows_adapter_size(tmp_path):
         from textual.widgets import Label
         label = pilot.app.query_one("#adapter-info", Label)
         assert "adapters" in str(label.content).lower()
+
+
+async def test_train_button_disabled_at_seeded_state(tmp_path):
+    """Train button must be disabled when status is SEEDED (above EMPTY but below PREPARED)."""
+    ws = tmp_path / "workspaces" / "d"
+    (ws / "seeds").mkdir(parents=True)
+    (ws / "seeds" / "approved.jsonl").write_text('{"conversation":[]}\n')
+    import os; os.chdir(tmp_path)
+    async with TrainApp(ws).run_test() as pilot:
+        await pilot.pause()
+        assert pilot.app.query_one("#train-btn", Button).disabled
+
+
+async def test_eval_buttons_disabled_at_evaluated_state(tmp_path):
+    """Eval buttons must be ENABLED at EVALUATED (already evaluated — should allow re-run)."""
+    ws = tmp_path / "workspaces" / "d"
+    (ws / "adapters").mkdir(parents=True)
+    (ws / "adapters" / "weights.npz").write_text("x")
+    (ws / "logs" / "evaluation").mkdir(parents=True)
+    import json; (ws / "logs" / "evaluation" / "base_model_evaluation.json").write_text(
+        json.dumps({"model_name": "base_model", "metrics": {}})
+    )
+    import os; os.chdir(tmp_path)
+    async with EvalApp(ws).run_test() as pilot:
+        await pilot.pause()
+        assert not pilot.app.query_one("#eval-btn", Button).disabled
+
+
+async def test_generate_button_enabled_at_prepared_state(tmp_path):
+    """Generate button must remain enabled at PREPARED (higher than SEEDED threshold)."""
+    ws = tmp_path / "workspaces" / "d"
+    (ws / "seeds").mkdir(parents=True)
+    (ws / "seeds" / "approved.jsonl").write_text('{"conversation":[]}\n')
+    (ws / "generated").mkdir(parents=True)
+    (ws / "generated" / "filtered.jsonl").write_text('{"conversation":[]}\n')
+    (ws / "processed").mkdir(parents=True)
+    (ws / "processed" / "train.json").write_text("[]")
+    import os; os.chdir(tmp_path)
+    async with SynthApp(ws).run_test() as pilot:
+        await pilot.pause()
+        assert not pilot.app.query_one("#gen-btn", Button).disabled
