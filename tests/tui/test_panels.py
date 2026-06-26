@@ -190,3 +190,49 @@ async def test_eval_results_table_loaded_from_json(tmp_path):
         from textual.widgets import DataTable
         table = pilot.app.query_one(DataTable)
         assert table.row_count >= 1
+
+
+from tui.panels.deployment import DeploymentPanel
+
+
+class DeployApp(App):
+    def __init__(self, ws: Path):
+        super().__init__()
+        self._ws = ws
+
+    def compose(self) -> ComposeResult:
+        yield DeploymentPanel(id="panel")
+
+    def on_mount(self) -> None:
+        self.query_one(DeploymentPanel).domain = self._ws.name
+
+
+async def test_ollama_button_disabled_without_fused(tmp_path):
+    ws = tmp_path / "workspaces" / "d"
+    ws.mkdir(parents=True)
+    import os; os.chdir(tmp_path)
+    async with DeployApp(ws).run_test() as pilot:
+        await pilot.pause()
+        assert pilot.app.query_one("#ollama-btn", Button).disabled
+
+
+async def test_ollama_button_enabled_with_fused(tmp_path):
+    ws = tmp_path / "workspaces" / "d"
+    (ws / "fused").mkdir(parents=True)
+    (ws / "fused" / "weights.safetensors").write_text("x")
+    import os; os.chdir(tmp_path)
+    async with DeployApp(ws).run_test() as pilot:
+        await pilot.pause()
+        assert not pilot.app.query_one("#ollama-btn", Button).disabled
+
+
+async def test_deployment_shows_adapter_size(tmp_path):
+    ws = tmp_path / "workspaces" / "d"
+    (ws / "adapters").mkdir(parents=True)
+    (ws / "adapters" / "adapter.npz").write_bytes(b"x" * 1024)
+    import os; os.chdir(tmp_path)
+    async with DeployApp(ws).run_test() as pilot:
+        await pilot.pause()
+        from textual.widgets import Label
+        label = pilot.app.query_one("#adapter-info", Label)
+        assert "adapters" in str(label.content).lower()
