@@ -20,12 +20,13 @@ Replace the broken `src/training/` module and the numbered `scripts/` folder wit
 | `src/training/lora_setup.py` | Entirely replaced by mlx-tune |
 | `src/training/metrics.py` | Replaced by `MetricsWriterCallback` |
 | `src/training/__init__.py` | Module gone |
-| `scripts/01_prepare_data.py` | Moved to `commands/prepare.py` |
-| `scripts/02_train_model.py` | Moved to `commands/train.py` |
-| `scripts/03_evaluate_model.py` | Moved to `commands/evaluate.py` |
-| `scripts/04_fuse_and_evaluate.py` | Moved to `commands/fuse.py` |
-| `scripts/upload_model_to_hf.py` | Already in `commands/upload.py` (from cli.py) |
-| `scripts/interactive_chat.py` | Moved to `commands/chat.py` |
+| `src/utils/plotting.py` | Drew matplotlib training curves — replaced by TUI sparkline. Dead code. |
+| `scripts/01_prepare_data.py` | Deleted. `commands/prepare.py` is a fresh rewrite. |
+| `scripts/02_train_model.py` | Deleted. `commands/train.py` is a fresh rewrite. |
+| `scripts/03_evaluate_model.py` | Deleted. `commands/evaluate.py` is a fresh rewrite. |
+| `scripts/04_fuse_and_evaluate.py` | Deleted. `commands/fuse.py` is a fresh rewrite. |
+| `scripts/upload_model_to_hf.py` | Deleted. `commands/upload.py` already exists (built in third slice). |
+| `scripts/interactive_chat.py` | Deleted. `commands/chat.py` is a fresh rewrite. |
 
 ### New file structure
 
@@ -33,25 +34,28 @@ Replace the broken `src/training/` module and the numbered `scripts/` folder wit
 cli.py                          # Entry point only (~10 lines)
 commands/
   __init__.py
-  init.py                       # domain init + seed import (moved from cli.py)
-  prepare.py                    # data preparation
-  train.py                      # train dispatcher: --method sft|dpo|grpo
-  evaluate.py                   # evaluation
-  fuse.py                       # adapter fusion + evaluation
-  upload.py                     # HuggingFace upload (moved from cli.py)
-  chat.py                       # interactive chat
+  init.py                       # domain init + seed import (moved from cli.py — already correct)
+  prepare.py                    # REWRITTEN: Typer wrapper around src/data/ for workspace model
+  train.py                      # REWRITTEN: mlx-tune dispatcher (sft/dpo/grpo)
+  evaluate.py                   # REWRITTEN: Typer wrapper around src/evaluation/ for workspace model
+  fuse.py                       # REWRITTEN: Typer wrapper around src/utils/fusion.py
+  upload.py                     # already correct (built in third slice)
+  chat.py                       # REWRITTEN: Typer wrapper around src/inference/ for workspace model
 src/
-  data/                         # unchanged
-  training/                     # NEW: clean mlx-tune wrappers
+  data/                         # unchanged (synthetic pipeline already verified)
+  training/                     # REWRITTEN: clean mlx-tune wrappers
     __init__.py
     sft.py                      # FastLanguageModel + SFTTrainer
     dpo.py                      # DPO trainer (stub until data pipeline ready)
     grpo.py                     # GRPO trainer (stub until data pipeline ready)
     metrics_writer.py           # TrainerCallback → training_metrics.json
-  evaluation/                   # one method fix only (see below)
-  inference/                    # unchanged
+  evaluation/                   # evaluator.py fixed; other modules verified during command build
+  inference/                    # modules verified during chat command build
+  utils/                        # fusion.py verified during fuse command build; plotting.py deleted
 tui/                            # subprocess call strings updated only
 ```
+
+**"REWRITTEN" means written from scratch** using the workspace-per-domain model (`workspaces/{domain}/`). The old scripts serve only as reference for understanding what arguments to accept — none of their implementation is carried forward. Each command task in the implementation plan includes an end-to-end smoke test of its `src/` module to surface any remaining API drift before it ships.
 
 ### `cli.py` — entry point only
 
