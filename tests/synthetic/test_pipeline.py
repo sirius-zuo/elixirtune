@@ -28,7 +28,7 @@ def test_run_generate_produces_filtered_contract(tmp_path):
     write_jsonl(ws / "seeds" / "approved.jsonl",
                 [make_record("seed code", "seed review", {"source": "bootstrap"})])
     gen = json.dumps({"reasoning": "", "user": "new code", "assistant": "new review", "category": "bug"})
-    teacher = FakeTeacher(responses=[gen, "5", gen, "5"])   # 2 generations, each judged 5
+    teacher = FakeTeacher(responses=[gen, "5", gen, "5"])   # gen, miss, gen → 2 raw; 1 survives dedup → judged 5
     embedder = FakeEmbedder({"new review": [1.0, 0.0]})
     run_dir = run_generate("code_review", _cfg(), teacher, embedder, root=tmp_path,
                            now="2026-06-25T14-30")
