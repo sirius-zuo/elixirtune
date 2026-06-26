@@ -6,12 +6,12 @@ def read_jsonl(path) -> list[dict]:
     p = Path(path)
     if not p.exists():
         return []
-    return [json.loads(line) for line in p.read_text().splitlines() if line.strip()]
+    return [json.loads(line) for line in p.read_text(encoding="utf-8").splitlines() if line.strip()]
 
 def write_jsonl(path, records: list[dict]) -> None:
     p = Path(path)
     p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in records))
+    p.write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in records), encoding="utf-8")
 
 def append_jsonl(path, records: list[dict]) -> None:
     p = Path(path)
