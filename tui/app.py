@@ -1,7 +1,6 @@
 from pathlib import Path
 
 from textual.app import App, ComposeResult
-from textual.css.query import QueryType
 from textual.reactive import reactive
 from textual.widget import Widget
 from textual.widgets import Header, TabbedContent, TabPane
@@ -69,26 +68,6 @@ class ElixirLoRAApp(App):
     def on_new_domain_requested(self, _: NewDomainRequested) -> None:
         from tui.new_domain import NewDomainScreen
         self.push_screen(NewDomainScreen(root=self._root))
-
-    def query_one(
-        self,
-        selector: str | type[QueryType],
-        expect_type: type[QueryType] | None = None,
-    ) -> QueryType | Widget:
-        """Query for a widget, including widgets in modal screens."""
-        try:
-            # Try the default query first (which searches the current screen stack)
-            return super().query_one(selector, expect_type)
-        except Exception:
-            # If not found in the primary path, search all screens in the stack
-            if isinstance(selector, str) and len(self.screen_stack) > 1:
-                # Try querying each screen in reverse order (top to bottom)
-                for screen in reversed(self.screen_stack):
-                    try:
-                        return screen.query_one(selector, expect_type)
-                    except Exception:
-                        continue
-            raise
 
     def _switch_domain(self, domain: str) -> None:
         for panel in self.query(BasePanel):

@@ -33,7 +33,7 @@ async def test_new_domain_button_opens_modal(tmp_path):
         await pilot.pause()
         from textual.widgets import Input
         # Modal is on screen — domain name input should be visible
-        assert pilot.app.query_one("#new-domain-name", Input) is not None
+        assert pilot.app.screen.query_one("#new-domain-name", Input) is not None
 
 
 async def test_new_domain_cancel_closes_modal(tmp_path):
