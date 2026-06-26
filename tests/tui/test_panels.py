@@ -29,7 +29,7 @@ async def test_overview_shows_seed_count(tmp_path):
         await pilot.pause()
         from textual.widgets import Label
         label = pilot.app.query_one("#overview-status", Label)
-        assert "2" in label._Static__content
+        assert "2" in str(label.content)
 
 
 async def test_overview_run_button_enabled_with_domain(tmp_path):
