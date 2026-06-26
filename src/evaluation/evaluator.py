@@ -6,9 +6,6 @@ from pathlib import Path
 from typing import List, Dict, Any, Tuple
 from tqdm import tqdm
 from mlx_lm import load, generate
-from mlx_lm.tuner import linear_to_lora_layers
-from mlx.utils import tree_flatten
-import mlx.core as mx
 from .metrics_calculator import MetricsCalculator
 
 
@@ -178,55 +175,10 @@ class ModelEvaluator:
         return model, tokenizer
     
     def load_model_with_adapters(self, base_model_path: str, adapter_path: str):
-        """Load base model with LoRA adapters applied at runtime.
-        
-        Args:
-            base_model_path: Path to base model
-            adapter_path: Path to adapter directory
-            
-        Returns:
-            Tuple of (model_with_adapters, tokenizer)
-        """
-        print(f"Loading base model: {base_model_path}")
-        model, tokenizer = load(base_model_path)
-        
-        # Load adapter configuration
-        adapter_config_path = Path(adapter_path) / "adapter_config.json"
-        if not adapter_config_path.exists():
-            raise FileNotFoundError(f"Adapter config not found: {adapter_config_path}")
-        
-        print(f"Loading adapter config: {adapter_config_path}")
-        with open(adapter_config_path, 'r') as f:
-            adapter_config = json.load(f)
-        
-        # Freeze base model
-        print("Freezing base model parameters...")
-        model.freeze()
-        
-        # Apply LoRA layers
-        print("Applying LoRA adapters...")
-        linear_to_lora_layers(
-            model,
-            adapter_config["lora_layers"],
-            adapter_config["lora_parameters"]
-        )
-        
-        # Load adapter weights
-        adapter_file = Path(adapter_path) / "adapters.safetensors"
-        if not adapter_file.exists():
-            raise FileNotFoundError(f"Adapter weights not found: {adapter_file}")
-        
-        print(f"Loading adapter weights: {adapter_file}")
-        model.load_weights(str(adapter_file), strict=False)
-        
-        # Count parameters
-        num_train_params = sum(v.size for _, v in tree_flatten(model.trainable_parameters()))
-        total_params = sum(v.size for _, v in tree_flatten(model.parameters()))
-        
-        print(f"✅ Model with LoRA adapters loaded successfully")
-        print(f"  Trainable parameters: {num_train_params:,} ({num_train_params/total_params*100:.2f}%)")
-        print(f"  Total parameters:     {total_params:,}")
-        
+        """Load base model with LoRA adapters using the stable mlx_lm public API."""
+        print(f"Loading model with adapters: {base_model_path} + {adapter_path}")
+        model, tokenizer = load(base_model_path, adapter_path=adapter_path)
+        print("Model with adapters loaded successfully")
         return model, tokenizer
     
     def evaluate_model_from_path(self, model_path: str, model_name: str = None, 
