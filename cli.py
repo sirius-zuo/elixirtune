@@ -23,8 +23,9 @@ def init(domain: str, desc: str = typer.Option(None), seeds: str = typer.Option(
     cand = _ws(domain) / "seeds" / "candidates.jsonl"
     cand.parent.mkdir(parents=True, exist_ok=True)
     if seeds:
-        write_jsonl(cand, read_jsonl(seeds))
-        typer.echo(f"Imported {len(read_jsonl(cand))} seeds to {cand}")
+        recs = read_jsonl(seeds)
+        write_jsonl(cand, recs)
+        typer.echo(f"Imported {len(recs)} seeds to {cand}")
     else:
         if not desc:
             raise typer.BadParameter("provide --seeds PATH or --desc TEXT")
