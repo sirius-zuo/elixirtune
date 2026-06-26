@@ -2,7 +2,7 @@ import json
 import pytest
 from pathlib import Path
 from textual.app import App, ComposeResult
-from textual.widgets import Button
+from textual.widgets import Button, Label
 from tui.app import BasePanel
 from tui.panels.overview import OverviewPanel
 
@@ -311,3 +311,56 @@ async def test_hf_upload_button_click_opens_modal(tmp_path):
         await pilot.pause()
         from tui.upload_modal import HFUploadScreen
         assert any(isinstance(s, HFUploadScreen) for s in pilot.app.screen_stack)
+
+
+# ── Training live progress tests ─────────────────────────────────────────────
+
+async def test_train_progress_label_updates_from_metrics(tmp_path):
+    ws = tmp_path / "workspaces" / "d"
+    (ws / "processed").mkdir(parents=True)
+    (ws / "processed" / "train.json").write_text("[]")
+    (ws / "logs" / "training").mkdir(parents=True)
+    metrics = {"train_loss": [2.0, 1.5], "val_loss": [2.1, 1.6], "iterations": [100, 200]}
+    (ws / "logs" / "training" / "training_metrics.json").write_text(
+        json.dumps(metrics)
+    )
+    import os; os.chdir(tmp_path)
+    async with TrainApp(ws).run_test() as pilot:
+        await pilot.pause()
+        panel = pilot.app.query_one(TrainingPanel)
+        panel._poll_metrics()
+        await pilot.pause()
+        label = pilot.app.query_one("#train-progress", Label)
+        assert "200" in str(label.content)
+        assert "1.500" in str(label.content)
+
+
+async def test_train_progress_sparkline_updates_from_metrics(tmp_path):
+    ws = tmp_path / "workspaces" / "d"
+    (ws / "logs" / "training").mkdir(parents=True)
+    metrics = {"train_loss": [2.0, 1.5, 1.0], "val_loss": [], "iterations": [100, 200, 300]}
+    (ws / "logs" / "training" / "training_metrics.json").write_text(
+        json.dumps(metrics)
+    )
+    import os; os.chdir(tmp_path)
+    async with TrainApp(ws).run_test() as pilot:
+        await pilot.pause()
+        panel = pilot.app.query_one(TrainingPanel)
+        panel._poll_metrics()
+        await pilot.pause()
+        from textual.widgets import Sparkline
+        sl = pilot.app.query_one(Sparkline)
+        assert list(sl.data) == [2.0, 1.5, 1.0]
+
+
+async def test_train_progress_no_op_without_metrics_file(tmp_path):
+    ws = tmp_path / "workspaces" / "d"
+    ws.mkdir(parents=True)
+    import os; os.chdir(tmp_path)
+    async with TrainApp(ws).run_test() as pilot:
+        await pilot.pause()
+        panel = pilot.app.query_one(TrainingPanel)
+        panel._poll_metrics()   # must not raise
+        await pilot.pause()
+        label = pilot.app.query_one("#train-progress", Label)
+        assert str(label.content) == ""

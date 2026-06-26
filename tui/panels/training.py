@@ -1,3 +1,4 @@
+# tui/panels/training.py
 import json
 import subprocess
 from pathlib import Path
@@ -23,12 +24,17 @@ _TRAIN_FIELDS = [
 class TrainingPanel(BasePanel):
     DEFAULT_CSS = "TrainingPanel { height: 100%; padding: 1; }"
 
+    def __init__(self, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self._poll_timer = None
+
     def compose(self) -> ComposeResult:
         yield ConfigForm(_TRAIN_FIELDS, id="train-config-form")
         yield Rule()
         yield Button("▶ Train", id="train-btn", disabled=True, variant="success")
         yield Rule()
         yield LogView(id="train-log")
+        yield Label("", id="train-progress")
         yield Sparkline([], id="loss-sparkline", summary_function=min)
 
     def refresh_content(self) -> None:
@@ -36,7 +42,9 @@ class TrainingPanel(BasePanel):
             return
         ws = Path("workspaces") / self.domain
         status = infer_status(ws)
-        self.query_one("#train-btn", Button).disabled = status_order(status) < status_order(Status.PREPARED)
+        self.query_one("#train-btn", Button).disabled = (
+            status_order(status) < status_order(Status.PREPARED)
+        )
         self._load_sparkline(ws)
 
     def _load_sparkline(self, ws: Path) -> None:
@@ -45,6 +53,26 @@ class TrainingPanel(BasePanel):
             metrics = json.loads(metrics_file.read_text())
             self.query_one(Sparkline).data = metrics.get("train_loss", [])
 
+    def _poll_metrics(self) -> None:
+        if not self.domain:
+            return
+        ws = Path("workspaces") / self.domain
+        metrics_file = ws / "logs" / "training" / "training_metrics.json"
+        if not metrics_file.exists():
+            return
+        metrics = json.loads(metrics_file.read_text())
+        train_loss = metrics.get("train_loss", [])
+        val_loss = metrics.get("val_loss", [])
+        iters = metrics.get("iterations", [])
+        if train_loss:
+            self.query_one(Sparkline).data = train_loss
+        if iters and train_loss:
+            tl = f"{train_loss[-1]:.3f}"
+            vl = f"{val_loss[-1]:.3f}" if val_loss else "—"
+            self.query_one("#train-progress", Label).update(
+                f"Iter {iters[-1]}   train: {tl}   val: {vl}"
+            )
+
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "train-btn" and self.domain:
             event.stop()
@@ -52,6 +80,7 @@ class TrainingPanel(BasePanel):
             ws = Path("workspaces") / self.domain
             generate_runtime_configs(ws)
             self._run_train(self.domain)
+            self._poll_timer = self.set_interval(2.0, self._poll_metrics)
 
     @work(thread=True)
     def _run_train(self, domain: str) -> None:
@@ -75,6 +104,11 @@ class TrainingPanel(BasePanel):
         self.query_one(LogView).write_line(event.line)
 
     def on_runner_done(self, event: RunnerDone) -> None:
+        if self._poll_timer is not None:
+            self._poll_timer.stop()
+            self._poll_timer = None
+        self._poll_metrics()
+        self.query_one("#train-progress", Label).update("")
         self.query_one("#train-btn", Button).disabled = False
         if event.exit_code != 0:
             self.query_one(LogView).write_line(
