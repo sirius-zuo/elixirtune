@@ -4,21 +4,24 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 import typer
 
-app = typer.Typer()
+app = typer.Typer(context_settings={"allow_interspersed_args": True})
 
 def _ws(domain: str) -> Path:
     return Path("workspaces") / domain
 
 
-@app.command()
+@app.callback(invoke_without_command=True)
 def evaluate(
-    domain: str,
+    ctx: typer.Context,
+    domain: str = typer.Argument(...),
     eval_config: Path = typer.Option(..., help="Path to runtime eval config YAML"),
     adapters_path: Path = typer.Option(None, help="Path to adapters dir (omit to eval base only)"),
     test_data: Path = typer.Option(None, help="Path to test.json (default: workspaces/<domain>/processed/test.json)"),
     fused_path: Path = typer.Option(None, help="Path to fused model dir (optional)"),
 ) -> None:
     """Evaluate base model and/or fine-tuned adapters for a domain."""
+    if ctx.invoked_subcommand is not None:
+        return
     from evaluation.evaluator import ModelEvaluator
     import yaml
 
