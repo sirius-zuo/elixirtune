@@ -1,7 +1,7 @@
 import json
 import pytest
 from pathlib import Path
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock
 
 
 def test_metrics_writer_callback_creates_file(tmp_path):
