@@ -64,7 +64,11 @@ def tui(domain: str = typer.Option(None, help="Domain to pre-select on launch"))
 
 
 @app.command()
-def prepare(domain: str, system_prompt: str = typer.Option(..., help="System prompt for the fine-tuned model")):
+def prepare(
+    domain: str,
+    system_prompt: str = typer.Option(..., help="System prompt for the fine-tuned model"),
+    out_dir: str = typer.Option(None, help="Output dir (default: workspaces/<domain>/processed)"),
+):
     """Convert filtered JSONL from generate into train/val/test splits for the training pipeline."""
     filtered = _ws(domain) / "generated" / "filtered.jsonl"
     if not filtered.exists():
@@ -79,11 +83,13 @@ def prepare(domain: str, system_prompt: str = typer.Option(..., help="System pro
     test_split = data_cfg.get("dataset", {}).get("test_split", 0.1)
     val_split = data_cfg.get("dataset", {}).get("val_split", 0.1)
 
-    preprocessor = DataPreprocessor(system_prompt=system_prompt, test_split_ratio=test_split, val_split_ratio=val_split)
+    preprocessor = DataPreprocessor(
+        system_prompt=system_prompt,
+        test_split_ratio=test_split,
+        val_split_ratio=val_split,
+    )
 
     records = read_jsonl(filtered)
-    # DataPreprocessor.extract_conversations expects a HF dataset-like object;
-    # replicate its logic directly over our list[dict] to avoid the HF dependency here.
     samples = []
     for rec in records:
         conversation = rec["conversation"]
@@ -96,14 +102,17 @@ def prepare(domain: str, system_prompt: str = typer.Option(..., help="System pro
     random.shuffle(samples)
     train, val, test = preprocessor.create_train_val_test_split(samples)
 
-    out = Path("data/processed")
+    out = Path(out_dir) if out_dir else _ws(domain) / "processed"
     out.mkdir(parents=True, exist_ok=True)
     for name, split in [("train", train), ("val", val), ("test", test)]:
         (out / f"{name}.json").write_text(json.dumps(split, indent=2))
     stats = {"train_size": len(train), "val_size": len(val), "test_size": len(test),
              "total_size": len(samples)}
     (out / "data_stats.json").write_text(json.dumps(stats, indent=2))
-    typer.echo(f"Prepared {len(samples)} samples → {out}  (train={len(train)}, val={len(val)}, test={len(test)})")
+    typer.echo(
+        f"Prepared {len(samples)} samples → {out}  "
+        f"(train={len(train)}, val={len(val)}, test={len(test)})"
+    )
 
 
 if __name__ == "__main__":
