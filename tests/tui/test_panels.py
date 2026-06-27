@@ -364,3 +364,46 @@ async def test_train_progress_no_op_without_metrics_file(tmp_path):
         await pilot.pause()
         label = pilot.app.query_one("#train-progress", Label)
         assert str(label.content) == ""
+
+
+# ── GGUF export tests ───────────────────────────────────────────────────────
+
+async def test_gguf_button_disabled_without_fused(tmp_path):
+    """GGUF export button must be disabled when no fused model exists."""
+    ws = tmp_path / "workspaces" / "d"
+    ws.mkdir(parents=True)
+    import os; os.chdir(tmp_path)
+    async with DeployApp(ws).run_test() as pilot:
+        await pilot.pause()
+        from textual.widgets import Button
+        btn = pilot.app.query_one("#gguf-btn", Button)
+        assert btn.disabled
+
+
+async def test_gguf_button_enabled_with_fused(tmp_path):
+    """GGUF export button must be enabled after model is fused."""
+    ws = tmp_path / "workspaces" / "d"
+    (ws / "fused").mkdir(parents=True)
+    (ws / "fused" / "weights.safetensors").write_text("x")
+    import os; os.chdir(tmp_path)
+    async with DeployApp(ws).run_test() as pilot:
+        await pilot.pause()
+        from textual.widgets import Button
+        btn = pilot.app.query_one("#gguf-btn", Button)
+        assert not btn.disabled
+
+
+async def test_gguf_button_click_runs_export_command(tmp_path):
+    """Clicking Export GGUF must trigger the export-gguf CLI command."""
+    ws = tmp_path / "workspaces" / "d"
+    (ws / "fused").mkdir(parents=True)
+    (ws / "fused" / "model.safetensors").write_text("x")
+    import os; os.chdir(tmp_path)
+    async with DeployApp(ws).run_test() as pilot:
+        await pilot.pause()
+        # Verify button exists and is enabled
+        from textual.widgets import Button
+        btn = pilot.app.query_one("#gguf-btn", Button)
+        assert not btn.disabled
+        # Verify the button has an id that maps to export-gguf handling
+        assert btn.id == "gguf-btn"

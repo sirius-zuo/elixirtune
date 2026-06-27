@@ -27,6 +27,7 @@ class DeploymentPanel(BasePanel):
         yield Label("Fused model: —", id="fused-info")
         yield Rule()
         yield Button("▶ Fuse & Evaluate", id="fuse-btn", disabled=True, variant="success")
+        yield Button("▶ Export GGUF", id="gguf-btn", disabled=True)
         yield Button("Create Ollama Model", id="ollama-btn", disabled=True)
         yield Button("Upload to HuggingFace", id="hf-upload-btn", disabled=True)
         yield Rule()
@@ -54,6 +55,9 @@ class DeploymentPanel(BasePanel):
         self.query_one("#hf-upload-btn", Button).disabled = (
             status_order(status) < status_order(Status.DEPLOYED)
         )
+        self.query_one("#gguf-btn", Button).disabled = (
+            status_order(status) < status_order(Status.DEPLOYED)
+        )
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if not self.domain:
@@ -77,6 +81,9 @@ class DeploymentPanel(BasePanel):
                 self.query_one("#hf-upload-btn", Button).disabled = True
                 self._run_upload(captured_domain, result["repo"], result["private"], result["token"])
             self.app.push_screen(HFUploadScreen(), callback=_on_upload_result)
+        elif event.button.id == "gguf-btn":
+            event.button.disabled = True
+            self._run_export_gguf(self.domain)
 
     @work(thread=True)
     def _run_fuse(self, domain: str) -> None:
@@ -120,6 +127,14 @@ class DeploymentPanel(BasePanel):
         except Exception as e:
             self.post_message(RunnerOutput(f"[red]Upload failed: {e}[/red]"))
             self.post_message(RunnerDone(1))
+
+    @work(thread=True)
+    def _run_export_gguf(self, domain: str) -> None:
+        cmd = [
+            "python3", "cli.py", "export-gguf", domain,
+            "--quantization", "Q4_K_M",
+        ]
+        self._stream(cmd)
 
     def _stream(self, cmd: list[str]) -> None:
         proc = subprocess.Popen(
