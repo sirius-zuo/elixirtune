@@ -8,7 +8,7 @@ from .generator import TextGenerator
 class ChatInterface:
     """Interactive chat interface for model testing."""
     
-    def __init__(self, model_path: str, system_prompt: str = None):
+    def __init__(self, model_path: str, system_prompt: str):
         """Initialize chat interface.
         
         Args:

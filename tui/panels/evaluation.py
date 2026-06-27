@@ -66,8 +66,8 @@ class EvaluationPanel(BasePanel):
     def _run_eval(self, domain: str) -> None:
         ws = Path("workspaces") / domain
         cmd = [
-            "python3", "scripts/03_evaluate_model.py",
-            "--config", str(ws / "runtime_eval_config.yaml"),
+            "python3", "cli.py", "evaluate", domain,
+            "--eval-config", str(ws / "runtime_eval_config.yaml"),
             "--adapters-path", str(ws / "adapters"),
             "--test-data", str(ws / "processed" / "test.json"),
         ]
@@ -77,7 +77,7 @@ class EvaluationPanel(BasePanel):
     def _run_fuse_eval(self, domain: str) -> None:
         ws = Path("workspaces") / domain
         cmd = [
-            "python3", "scripts/04_fuse_and_evaluate.py",
+            "python3", "cli.py", "fuse", domain,
             "--model-config", str(ws / "runtime_model_config.yaml"),
             "--eval-config", str(ws / "runtime_eval_config.yaml"),
             "--test-data", str(ws / "processed" / "test.json"),

@@ -98,7 +98,7 @@ class TrainingPanel(BasePanel):
     def _run_train(self, domain: str) -> None:
         ws = Path("workspaces") / domain
         cmd = [
-            "python3", "scripts/02_train_model.py",
+            "python3", "cli.py", "train", domain,
             "--model-config", str(ws / "runtime_model_config.yaml"),
             "--training-config", str(ws / "runtime_training_config.yaml"),
             "--train-data", str(ws / "processed" / "train.json"),
