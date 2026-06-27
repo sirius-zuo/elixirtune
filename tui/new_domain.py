@@ -28,12 +28,13 @@ class NewDomainScreen(ModalScreen):
         yield RadioSet(
             RadioButton("Bootstrap from description", id="rb-bootstrap", value=True),
             RadioButton("Import from file", id="rb-import"),
+            RadioButton("Download code review dataset", id="rb-code-review"),
             id="source-radio",
         )
         yield Label("Description:")
-        yield TextArea(id="desc-input")
+        yield TextArea(id="new-domain-desc")
         yield Label("Seeds file path:")
-        yield Input(id="seeds-path-input", placeholder="/path/to/seeds.jsonl")
+        yield Input(id="new-domain-seeds-path", placeholder="/path/to/seeds.jsonl")
         yield Button("Create", id="new-domain-create", variant="primary")
         yield Button("Cancel", id="new-domain-cancel")
 
@@ -45,12 +46,17 @@ class NewDomainScreen(ModalScreen):
             if not name or " " in name:
                 return
             radio = self.query_one(RadioSet)
-            use_seeds = radio.pressed_button and radio.pressed_button.id == "rb-import"
-            if use_seeds:
-                seeds = self.query_one("#seeds-path-input", Input).value.strip()
+            pressed = radio.pressed_button and radio.pressed_button.id
+            if pressed == "rb-import":
+                seeds = self.query_one("#new-domain-seeds-path", Input).value.strip()
                 cmd = ["python3", "cli.py", "init", name, "--seeds", seeds]
-            else:
-                desc = self.query_one("#desc-input", TextArea).text.strip() or f"{name} domain"
+            elif pressed == "rb-code-review":
+                cmd = ["python3", "examples/code_review/setup.py", "--domain", name]
+            else:  # bootstrap
+                desc = self.query_one("#new-domain-desc", TextArea).text.strip() or f"{name} domain"
                 cmd = ["python3", "cli.py", "init", name, "--desc", desc]
             result = subprocess.run(cmd, capture_output=True, text=True)
-            self.dismiss({"name": name, "success": result.returncode == 0})
+            if result.returncode == 0:
+                self.dismiss({"name": name, "success": True})
+            else:
+                self.dismiss({"name": name, "success": False, "error": result.stderr})
