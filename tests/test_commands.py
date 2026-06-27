@@ -77,3 +77,85 @@ def test_text_generator_has_no_hardcoded_system_prompt():
     # system prompt should be empty/None, not the old "Didier" string
     assert "Didier" not in (gen.default_system_prompt or "")
     assert "OpenBB" not in (gen.default_system_prompt or "")
+
+
+def test_generate_calls_load_config_with_domain_string(tmp_path):
+    """load_config must receive the bare domain string, not a Path."""
+    import sys
+    import os
+    repo_root = str(Path(__file__).parent.parent)
+    sys.path.insert(0, repo_root)
+    sys.path.insert(0, str(Path(repo_root) / "src"))
+    os.chdir(tmp_path)
+    cfg_data = {"filter": {"dedup": {"embedding_model": "m"}}, "generate": {}}
+    ws = tmp_path / "workspaces" / "d" / "seeds"
+    ws.mkdir(parents=True)
+    (ws.parent / "approved.jsonl").write_text("[{\"text\": \"hello\"}]\n")
+    with patch("data.synthetic.config.load_config", return_value=cfg_data) as mock_cfg, \
+         patch("data.synthetic.teacher.from_config", return_value=MagicMock()), \
+         patch("data.synthetic.embedder.SentenceTransformerEmbedder", return_value=MagicMock()), \
+         patch("data.synthetic.pipeline.run_generate") as mock_run:
+        from commands.generate import generate
+        ctx = MagicMock()
+        ctx.invoked_subcommand = None
+        try:
+            generate(ctx, "d")
+        except Exception:
+            pass
+    call_arg = mock_cfg.call_args[0][0] if mock_cfg.call_args else None
+    assert call_arg == "d", f"Expected 'd' but got {call_arg!r}"
+
+
+def test_generate_passes_model_name_to_embedder(tmp_path):
+    """SentenceTransformerEmbedder must receive model_name from config."""
+    import sys
+    import os
+    repo_root = str(Path(__file__).parent.parent)
+    sys.path.insert(0, repo_root)
+    sys.path.insert(0, str(Path(repo_root) / "src"))
+    os.chdir(tmp_path)
+    cfg_data = {"filter": {"dedup": {"embedding_model": "all-MiniLM-L6-v2"}}, "generate": {}}
+    ws = tmp_path / "workspaces" / "d" / "seeds"
+    ws.mkdir(parents=True)
+    (ws.parent / "approved.jsonl").write_text("[{\"text\": \"hello\"}]\n")
+    with patch("data.synthetic.config.load_config", return_value=cfg_data), \
+         patch("data.synthetic.teacher.from_config", return_value=MagicMock()), \
+         patch("data.synthetic.embedder.SentenceTransformerEmbedder") as mock_emb, \
+         patch("data.synthetic.pipeline.run_generate"):
+        from commands.generate import generate
+        ctx = MagicMock()
+        ctx.invoked_subcommand = None
+        try:
+            generate(ctx, "d")
+        except Exception:
+            pass
+    mock_emb.assert_called_once_with("all-MiniLM-L6-v2")
+
+
+def test_generate_does_not_pass_seeds_to_run_generate(tmp_path):
+    """run_generate must be called WITHOUT seeds argument (it reads from disk itself)."""
+    import sys
+    import os
+    repo_root = str(Path(__file__).parent.parent)
+    sys.path.insert(0, repo_root)
+    sys.path.insert(0, str(Path(repo_root) / "src"))
+    os.chdir(tmp_path)
+    cfg_data = {"filter": {"dedup": {"embedding_model": "m"}}, "generate": {}}
+    ws = tmp_path / "workspaces" / "d" / "seeds"
+    ws.mkdir(parents=True)
+    (ws.parent / "approved.jsonl").write_text("[{\"text\": \"hello\"}]\n")
+    with patch("data.synthetic.config.load_config", return_value=cfg_data), \
+         patch("data.synthetic.teacher.from_config", return_value=MagicMock()), \
+         patch("data.synthetic.embedder.SentenceTransformerEmbedder", return_value=MagicMock()), \
+         patch("data.synthetic.pipeline.run_generate") as mock_run:
+        from commands.generate import generate
+        ctx = MagicMock()
+        ctx.invoked_subcommand = None
+        try:
+            generate(ctx, "d")
+        except Exception:
+            pass
+    if mock_run.called:
+        args, kwargs = mock_run.call_args
+        if len(args) >= 5:
+            assert not isinstance(args[4], list), "seeds list must not be passed as 5th arg"

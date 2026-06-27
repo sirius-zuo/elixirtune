@@ -7,7 +7,6 @@ from data.synthetic.config import load_config
 from data.synthetic.teacher import from_config
 from data.synthetic.embedder import SentenceTransformerEmbedder
 from data.synthetic.pipeline import run_generate
-from data.synthetic.io import read_jsonl
 
 app = typer.Typer(context_settings={"allow_interspersed_args": True})
 
@@ -19,8 +18,7 @@ def generate(ctx: typer.Context, domain: str = typer.Argument(...)):
     """Generate and filter synthetic training data."""
     if ctx.invoked_subcommand is not None:
         return
-    cfg = load_config(_ws(domain) / "config.yaml")
+    cfg = load_config(domain)
     teacher = from_config(cfg)
-    embedder = SentenceTransformerEmbedder()
-    seeds = read_jsonl(_ws(domain) / "seeds" / "approved.jsonl")
-    run_generate(domain, cfg, teacher, embedder, seeds)
+    embedder = SentenceTransformerEmbedder(cfg["filter"]["dedup"]["embedding_model"])
+    run_generate(domain, cfg, teacher, embedder)
