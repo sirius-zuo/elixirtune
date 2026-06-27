@@ -24,7 +24,7 @@ class ModelEvaluator:
         self.eval_config = self.config['evaluation']
         self.metrics_config = self.config['metrics']
         self.comparison_config = self.config['comparison']
-        self.paths_config = self.config['paths']
+        self.paths_config = self.config.get('paths', {})
         
         self.metrics_calculator = MetricsCalculator()
     
@@ -38,7 +38,7 @@ class ModelEvaluator:
             Tuple of (questions, answers)
         """
         if test_data_path is None:
-            test_data_path = self.paths_config['test_data']
+            test_data_path = self.paths_config.get('test_data')
         
         print(f"Loading test data from: {test_data_path}")
         
@@ -151,7 +151,7 @@ class ModelEvaluator:
         Returns:
             Path to saved results file
         """
-        results_dir = Path(self.paths_config['results_dir'])
+        results_dir = Path(self.paths_config.get('results_dir', 'logs/evaluation'))
         results_dir.mkdir(parents=True, exist_ok=True)
         
         results_file = results_dir / f"{model_name}_evaluation.json"
@@ -454,7 +454,7 @@ class ModelEvaluator:
         """
         from datetime import datetime
         
-        results_dir = Path(self.paths_config['results_dir'])
+        results_dir = Path(self.paths_config.get('results_dir', 'logs/evaluation'))
         results_dir.mkdir(parents=True, exist_ok=True)
         
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")

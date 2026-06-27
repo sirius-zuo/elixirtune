@@ -159,3 +159,19 @@ def test_generate_does_not_pass_seeds_to_run_generate(tmp_path):
         args, kwargs = mock_run.call_args
         if len(args) >= 5:
             assert not isinstance(args[4], list), "seeds list must not be passed as 5th arg"
+
+
+def test_model_evaluator_init_without_paths_block(tmp_path):
+    """ModelEvaluator must not crash when config has no paths: section."""
+    import sys
+    sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+    eval_cfg = tmp_path / "eval.yaml"
+    eval_cfg.write_text(
+        "evaluation:\n  method: simple\n  max_tokens: 200\n  temperature: 0.7\n"
+        "metrics:\n  simple:\n    word_overlap_threshold: 0.5\n"
+        "comparison:\n  compare_with_base: true\n"
+        "  score_thresholds:\n    excellent: 0.9\n    good: 0.7\n    acceptable: 0.5\n    poor: 0.3\n"
+    )
+    from evaluation.evaluator import ModelEvaluator
+    evaluator = ModelEvaluator(str(eval_cfg))   # must not raise
+    assert evaluator.paths_config == {}
