@@ -6,8 +6,7 @@ import typer
 
 app = typer.Typer(context_settings={"allow_interspersed_args": True})
 
-def _ws(domain: str) -> Path:
-    return Path("workspaces") / domain
+from commands import _ws
 
 @app.callback(invoke_without_command=True)
 def upload(

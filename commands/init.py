@@ -4,11 +4,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 import typer
 from data.synthetic.io import read_jsonl, write_jsonl
+from commands import _ws
 
 app = typer.Typer(context_settings={"allow_interspersed_args": True})
-
-def _ws(domain: str) -> Path:
-    return Path("workspaces") / domain
 
 @app.callback(invoke_without_command=True)
 def init(ctx: typer.Context, domain: str = typer.Argument(...), desc: str = typer.Option(None), seeds: str = typer.Option(None)):

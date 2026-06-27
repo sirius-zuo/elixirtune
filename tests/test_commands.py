@@ -273,3 +273,12 @@ def test_chat_system_prompt_logs_yaml_error(tmp_path, capsys):
     assert result == "You are a helpful assistant."
     # The YAML error must appear somewhere — either in buf or via typer.echo(err=True)
     # We just verify it doesn't silently vanish AND the fallback is returned
+
+
+def test_ws_returns_correct_path():
+    """_ws helper must return workspaces/<domain>."""
+    import sys
+    sys.path.insert(0, str(Path(__file__).parent.parent))
+    from commands import _ws
+    assert _ws("d") == Path("workspaces/d")
+    assert str(_ws("math")).endswith("workspaces/math")
