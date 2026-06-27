@@ -49,18 +49,21 @@ def run(
         else None
     )
 
+    sft_args = dict(
+        output_dir=output_dir,
+        per_device_train_batch_size=t_cfg["training"]["batch_size"],
+        learning_rate=t_cfg["training"]["learning_rate"],
+        max_steps=t_cfg["training"]["iters"],
+    )
+    if eval_ds is not None:
+        sft_args["eval_steps"] = t_cfg["training"]["steps_per_eval"]
+
     trainer = SFTTrainer(
         model=model,
         tokenizer=tokenizer,
         train_dataset=train_ds,
         eval_dataset=eval_ds,
-        args=SFTConfig(
-            output_dir=output_dir,
-            per_device_train_batch_size=t_cfg["training"]["batch_size"],
-            learning_rate=t_cfg["training"]["learning_rate"],
-            max_steps=t_cfg["training"]["iters"],
-            eval_steps=t_cfg["training"]["steps_per_eval"],
-        ),
+        args=SFTConfig(**sft_args),
         callbacks=[MetricsWriterCallback(metrics_path)],
     )
     trainer.train()
