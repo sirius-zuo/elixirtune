@@ -20,8 +20,8 @@ def _system_prompt(domain: str) -> str:
             sp = data.get("chat", {}).get("system_prompt") if isinstance(data, dict) else None
             if sp:
                 return sp
-        except Exception:
-            pass
+        except Exception as e:
+            typer.echo(f"Error reading {cfg_path}: {e}", err=True)
     return "You are a helpful assistant."
 
 

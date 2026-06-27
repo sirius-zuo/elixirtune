@@ -24,5 +24,6 @@ def init(ctx: typer.Context, domain: str = typer.Argument(...), desc: str = type
     else:
         cand.touch()
         typer.echo(f"Created empty seed file at {cand}")
+        typer.echo("Add seeds to the file or re-run with --seeds <path>", err=True)
     if desc:
         (_ws(domain) / "description.txt").write_text(desc)
