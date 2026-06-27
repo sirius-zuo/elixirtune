@@ -3,7 +3,7 @@ import yaml
 from pathlib import Path
 from datasets import Dataset
 
-from src.training.metrics_writer import MetricsWriterCallback
+from .metrics_writer import MetricsWriterCallback
 
 
 def _load_configs(model_config_path: Path, training_config_path: Path) -> dict:
