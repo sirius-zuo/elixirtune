@@ -18,18 +18,31 @@ def evaluate(
     adapters_path: Path = typer.Option(None, help="Path to adapters dir (omit to eval base only)"),
     test_data: Path = typer.Option(None, help="Path to test.json (default: workspaces/<domain>/processed/test.json)"),
     fused_path: Path = typer.Option(None, help="Path to fused model dir (optional)"),
+    model_config: Path = typer.Option(
+        None,
+        help="Path to model config YAML (default: workspaces/<domain>/runtime_model_config.yaml)",
+    ),
 ) -> None:
     """Evaluate base model and/or fine-tuned adapters for a domain."""
     if ctx.invoked_subcommand is not None:
         return
-    from evaluation.evaluator import ModelEvaluator
     import yaml
+    from evaluation.evaluator import ModelEvaluator
 
     ws = _ws(domain)
     if test_data is None:
         test_data = ws / "processed" / "test.json"
 
-    model_cfg = yaml.safe_load((ws / "runtime_model_config.yaml").read_text())
+    cfg_path = Path(model_config) if model_config else ws / "runtime_model_config.yaml"
+    if not cfg_path.exists():
+        typer.echo(
+            f"Model config not found at {cfg_path}. "
+            "Pass --model-config <path> or run the TUI first (which generates runtime configs).",
+            err=True,
+        )
+        raise typer.Exit(1)
+
+    model_cfg = yaml.safe_load(cfg_path.read_text())
     base_model = model_cfg["base_model"]["path"]
 
     evaluator = ModelEvaluator(str(eval_config))

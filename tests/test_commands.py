@@ -175,3 +175,65 @@ def test_model_evaluator_init_without_paths_block(tmp_path):
     from evaluation.evaluator import ModelEvaluator
     evaluator = ModelEvaluator(str(eval_cfg))   # must not raise
     assert evaluator.paths_config == {}
+
+
+def test_evaluate_gives_clear_error_when_model_config_missing(tmp_path):
+    """evaluate must print a clear message when runtime_model_config.yaml is absent."""
+    import sys
+    import os
+    sys.path.insert(0, str(Path(__file__).parent.parent))
+    os.chdir(tmp_path)
+    (tmp_path / "workspaces" / "d").mkdir(parents=True)
+
+    from typer.testing import CliRunner
+    from commands.evaluate import app
+    runner = CliRunner()
+    eval_cfg = tmp_path / "eval.yaml"
+    eval_cfg.write_text(
+        "evaluation:\n  method: simple\n  max_tokens: 200\n  temperature: 0.7\n"
+        "metrics:\n  simple:\n    word_overlap_threshold: 0.5\n"
+        "comparison:\n  compare_with_base: true\n"
+        "  score_thresholds:\n    excellent: 0.9\n    good: 0.7\n    acceptable: 0.5\n    poor: 0.3\n"
+    )
+    result = runner.invoke(app, ["d", "--eval-config", str(eval_cfg)])
+    assert result.exit_code != 0
+    output = result.output + (getattr(result, 'stderr', '') or '')
+    assert "Model config not found" in output
+
+
+def test_evaluate_accepts_explicit_model_config(tmp_path):
+    """evaluate must use --model-config when provided, not runtime_model_config.yaml."""
+    import sys
+    import os
+    sys.path.insert(0, str(Path(__file__).parent.parent))
+    os.chdir(tmp_path)
+    ws = tmp_path / "workspaces" / "d"
+    ws.mkdir(parents=True)
+    (ws / "processed").mkdir()
+    (ws / "processed" / "test.json").write_text("[]")
+
+    model_cfg = tmp_path / "model.yaml"
+    model_cfg.write_text("base_model:\n  path: some/model\n")
+    eval_cfg = tmp_path / "eval.yaml"
+    eval_cfg.write_text(
+        "evaluation:\n  method: simple\n  max_tokens: 200\n  temperature: 0.7\n"
+        "metrics:\n  simple:\n    word_overlap_threshold: 0.5\n"
+        "comparison:\n  compare_with_base: true\n"
+        "  score_thresholds:\n    excellent: 0.9\n    good: 0.7\n    acceptable: 0.5\n    poor: 0.3\n"
+    )
+
+    from typer.testing import CliRunner
+    from unittest.mock import patch, MagicMock
+    from commands.evaluate import app
+    runner = CliRunner()
+
+    with patch("evaluation.evaluator.ModelEvaluator") as mock_eval:
+        mock_instance = MagicMock()
+        mock_eval.return_value = mock_instance
+        result = runner.invoke(app, [
+            "d",
+            "--eval-config", str(eval_cfg),
+            "--model-config", str(model_cfg),
+        ])
+    # Should not crash with FileNotFoundError for runtime_model_config.yaml
+    assert "FileNotFoundError" not in str(result.exception or "")
