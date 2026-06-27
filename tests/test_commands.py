@@ -65,3 +65,15 @@ def test_fuse_calls_adapter_fusion(tmp_path):
 
     mock_validate.assert_called_once_with("some/model", str(adapters_dir))
     mock_fuse.assert_called_once_with("some/model", str(adapters_dir), str(fused_out))
+
+
+def test_text_generator_has_no_hardcoded_system_prompt():
+    """TextGenerator must not default to any hardcoded persona."""
+    import sys; sys.path.insert(0, "src")
+    from inference.generator import TextGenerator
+    from unittest.mock import patch, MagicMock
+    with patch("inference.generator.load", return_value=(MagicMock(), MagicMock())):
+        gen = TextGenerator("some/model", system_prompt=None)
+    # system prompt should be empty/None, not the old "Didier" string
+    assert "Didier" not in (gen.default_system_prompt or "")
+    assert "OpenBB" not in (gen.default_system_prompt or "")

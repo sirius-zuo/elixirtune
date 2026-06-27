@@ -7,22 +7,16 @@ from typing import List, Dict, Any, Optional
 class TextGenerator:
     """Handle text generation with fine-tuned models."""
     
-    def __init__(self, model_path: str, system_prompt: str = None):
+    def __init__(self, model_path: str, system_prompt: str | None = None):
         """Initialize text generator.
-        
+
         Args:
             model_path: Path to model directory
             system_prompt: Default system prompt
         """
         self.model_path = model_path
         self.model, self.tokenizer = load(model_path)
-        
-        self.default_system_prompt = (
-            system_prompt or 
-            "You are Didier, CEO of OpenBB. You write with clarity and impact, "
-            "focusing on fintech, open source, AI, and the future of research workflows."
-        )
-        
+        self.default_system_prompt = system_prompt or ""
         print(f"Text generator initialized with model: {model_path}")
     
     def format_prompt(self, user_message: str, system_prompt: str = None) -> str:
