@@ -82,7 +82,7 @@ class DeploymentPanel(BasePanel):
     def _run_fuse(self, domain: str) -> None:
         ws = Path("workspaces") / domain
         cmd = [
-            "python3", "scripts/04_fuse_and_evaluate.py",
+            "python3", "cli.py", "fuse", domain,
             "--model-config", str(ws / "runtime_model_config.yaml"),
             "--eval-config", str(ws / "runtime_eval_config.yaml"),
             "--test-data", str(ws / "processed" / "test.json"),
