@@ -129,6 +129,7 @@ ConfigForm .preset-save-row #cfg-save-preset { width: auto; }
             data = yaml.safe_load(path.read_text()) if path.exists() else {}
             current = str(_get_nested(data, f.key_path))
             yield Input(value=current, password=f.password, id=_input_id(f.label))
+        yield SectionRule("Save config as:")
         with Horizontal(classes="preset-save-row"):
             yield Input(placeholder="preset name (required)…", id="preset-name")
             yield Button("Save", id="cfg-save-preset", variant="primary")
