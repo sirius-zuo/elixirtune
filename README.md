@@ -1,12 +1,14 @@
 # ElixirLoRA
 
-Domain-specific LoRA fine-tuning on Apple Silicon. Point it at a local LLM, describe what you want to teach, and it generates synthetic training data, fine-tunes a model, and gives you an interactive chat interface — all through a single CLI or a Textual TUI.
+Fine-tuning an LLM involves many moving parts — data preparation, training runs, evaluation, adapter fusion, and deployment. ElixirLoRA is a LoRA fine-tuning workbench for Apple Silicon that organizes the full pipeline into a single managed workspace per domain, driven by a guided TUI or CLI.
+
+Each domain gets its own workspace under `workspaces/<domain>/`, tracking everything from raw seed examples through trained adapters to a deployable GGUF — so the state of any fine-tuning project is always visible and reproducible. Synthetic training data generation from a local teacher LLM is available as an optional step when you don't have enough hand-curated examples.
 
 ## Requirements
 
 - Apple Silicon Mac (MLX)
 - Python 3.11+
-- A local OpenAI-compatible LLM server (e.g. [Ollama](https://ollama.com), llama.cpp) to act as the teacher model
+- A local OpenAI-compatible LLM server (e.g. [Ollama](https://ollama.com), llama.cpp) — only required for synthetic data generation
 
 ## Setup
 
@@ -19,14 +21,23 @@ pip install -r requirements.txt
 
 ## Quick Start
 
+Launch the TUI to be guided through the full pipeline:
+
+```bash
+python3 cli.py tui
+python3 cli.py tui --domain mymodel   # pre-select a domain
+```
+
+Or drive the pipeline directly from the CLI:
+
 ```bash
 # 1. Create a domain workspace
 python3 cli.py init mymodel --desc "A helpful coding assistant"
 
-# 2. Curate seed examples (edit workspaces/mymodel/seeds/candidates.jsonl first)
+# 2. Add examples to workspaces/mymodel/seeds/candidates.jsonl, then curate
 python3 cli.py curate mymodel
 
-# 3. Generate synthetic training data
+# 3. (Optional) Generate synthetic training data from a teacher LLM
 python3 cli.py generate mymodel
 
 # 4. Format into train/val/test splits
@@ -38,15 +49,8 @@ python3 cli.py train mymodel --method sft \
   --training-config workspaces/mymodel/runtime_training_config.yaml \
   --train-data workspaces/mymodel/processed/train.json
 
-# 6. Chat
+# 6. Chat with your model
 python3 cli.py chat mymodel
-```
-
-Or launch the guided TUI:
-
-```bash
-python3 cli.py tui
-python3 cli.py tui --domain mymodel   # pre-select a domain
 ```
 
 ## Project Layout
@@ -202,7 +206,7 @@ HF_TOKEN=hf_... python3 cli.py upload <domain> \
 ```
 
 ### `tui`
-Guided terminal UI that wraps the full pipeline with log streaming and config forms.
+The primary interface. Guides you through the full pipeline — workspace management, training, evaluation, and deployment — with live log streaming and interactive config forms.
 
 ```bash
 python3 cli.py tui [--domain <domain>]
@@ -222,9 +226,9 @@ chat:
   system_prompt: "You are an expert in Elixir."
 ```
 
-## Synthetic Data Pipeline
+## Synthetic Data Generation (Optional)
 
-The `generate` command runs this pipeline internally:
+When you don't have enough hand-curated training examples, the `generate` command can synthesize more from a local teacher LLM. It runs this pipeline internally:
 
 ```
 approved seeds
