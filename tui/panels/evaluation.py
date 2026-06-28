@@ -3,26 +3,30 @@ import subprocess
 from pathlib import Path
 
 from textual.app import ComposeResult
-from textual.widgets import Button, DataTable, Rule
+from textual.containers import Horizontal
+from textual.widgets import Button, DataTable
 from textual import work
 
 from tui.app import BasePanel
-from tui.domain import infer_status, Status, generate_runtime_configs, status_order
-from tui.runner import RunnerOutput, RunnerDone
+from tui.domain import infer_status, Status, generate_runtime_configs, status_order, resolve_adapters_dir
+from tui.runner import RunnerOutput, RunnerDone, stream_subprocess
 from tui.widgets.log_view import LogView
+from tui.widgets.section_rule import SectionRule
 
 
 class EvaluationPanel(BasePanel):
     DEFAULT_CSS = "EvaluationPanel { height: 100%; padding: 1; }"
 
     def compose(self) -> ComposeResult:
-        yield Button("▶ Evaluate", id="eval-btn", disabled=True, variant="success")
-        yield Button("▶ Fuse & Evaluate", id="fuse-eval-btn", disabled=True)
-        yield Rule()
+        yield SectionRule("Run Evaluation")
+        with Horizontal(classes="btn-row"):
+            yield Button("▶ Evaluate", id="eval-btn", disabled=True, variant="success")
+            yield Button("▶ Fuse & Evaluate", id="fuse-eval-btn", disabled=True, variant="success")
+        yield SectionRule("Results")
         dt = DataTable(id="eval-table")
         dt.add_columns("Model", "BERTScore F1", "Word Overlap")
         yield dt
-        yield Rule()
+        yield SectionRule("Log")
         yield LogView(id="eval-log")
 
     def refresh_content(self) -> None:
@@ -55,11 +59,16 @@ class EvaluationPanel(BasePanel):
         event.stop()
         ws = Path("workspaces") / self.domain
         generate_runtime_configs(ws)
+        log = self.query_one(LogView)
         if event.button.id == "eval-btn":
             event.button.disabled = True
+            log.clear()
+            log.write_line("Starting evaluation (up to 100 samples)...")
             self._run_eval(self.domain)
         elif event.button.id == "fuse-eval-btn":
             event.button.disabled = True
+            log.clear()
+            log.write_line("Starting fuse & evaluate (up to 100 samples)...")
             self._run_fuse_eval(self.domain)
 
     @work(thread=True)
@@ -68,8 +77,9 @@ class EvaluationPanel(BasePanel):
         cmd = [
             "python3", "cli.py", "evaluate", domain,
             "--eval-config", str(ws / "runtime_eval_config.yaml"),
-            "--adapters-path", str(ws / "adapters"),
+            "--adapters-path", str(resolve_adapters_dir(ws)),
             "--test-data", str(ws / "processed" / "test.json"),
+            "--max-samples", "100",
         ]
         self._stream(cmd)
 
@@ -81,19 +91,18 @@ class EvaluationPanel(BasePanel):
             "--model-config", str(ws / "runtime_model_config.yaml"),
             "--eval-config", str(ws / "runtime_eval_config.yaml"),
             "--test-data", str(ws / "processed" / "test.json"),
-            "--adapters-path", str(ws / "adapters"),
+            "--adapters-path", str(resolve_adapters_dir(ws)),
             "--output-path", str(ws / "fused"),
+            "--max-samples", "100",
         ]
         self._stream(cmd)
 
     def _stream(self, cmd: list[str]) -> None:
-        proc = subprocess.Popen(
-            cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
-        )
-        for line in proc.stdout:
-            self.post_message(RunnerOutput(line.rstrip()))
-        proc.wait()
-        self.post_message(RunnerDone(proc.returncode))
+        for line, code in stream_subprocess(cmd):
+            if line is not None:
+                self.post_message(RunnerOutput(line))
+            else:
+                self.post_message(RunnerDone(code))
 
     def on_runner_output(self, event: RunnerOutput) -> None:
         self.query_one(LogView).write_line(event.line)
@@ -108,4 +117,4 @@ class EvaluationPanel(BasePanel):
         else:
             self.query_one(LogView).write_line("[green]Evaluation complete.[/green]")
         self.refresh_content()
-        self.app._rescan()
+        self.call_later(self.app._rescan)

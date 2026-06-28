@@ -29,6 +29,18 @@ from tui.panels.deployment import DeploymentPanel
 
 
 class ElixirLoRAApp(App):
+    TITLE = "ElixirLoRA"
+    CSS = """
+    #main-tabs { height: 1fr; }
+    TabPane { height: 1fr; }
+    Button.-success { background: #0178D4; color: #ffffff; }
+    Button.-success:hover { background: #3399e0; color: #ffffff; }
+    Button.-success:focus { background: #0178D4; color: #ffffff; }
+    Button.-success:disabled { background: #1a4a6b; color: #555555; }
+    .btn-row { height: auto; }
+    .btn-row Button { margin-right: 2; }
+    """
+
     def __init__(
         self,
         initial_domain: str | None = None,
@@ -37,6 +49,7 @@ class ElixirLoRAApp(App):
         super().__init__()
         self._initial_domain = initial_domain
         self._root = Path(root)
+        self._current_domain: str | None = None
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -56,8 +69,8 @@ class ElixirLoRAApp(App):
                 from tui.panels.chat import ChatPanel  # local import avoids circular dep
                 yield ChatPanel(id="panel-chat")
 
-    def on_mount(self) -> None:
-        self._rescan()
+    async def on_mount(self) -> None:
+        await self._rescan()
         target = self._initial_domain
         if not target:
             domains = scan_domains(self._root)
@@ -66,16 +79,23 @@ class ElixirLoRAApp(App):
             self._switch_domain(target)
 
     def on_domain_selected(self, event: DomainSelected) -> None:
-        self._switch_domain(event.domain)
+        if event.domain != self._current_domain:
+            self._switch_domain(event.domain)
 
     def on_new_domain_requested(self, _: NewDomainRequested) -> None:
         from tui.new_domain import NewDomainScreen
         self.push_screen(NewDomainScreen(root=self._root))
 
+    def on_tabbed_content_tab_activated(self, event: TabbedContent.TabActivated) -> None:
+        for panel in event.pane.query(BasePanel):
+            panel.refresh_content()
+
     def _switch_domain(self, domain: str) -> None:
+        self._current_domain = domain
         for panel in self.query(BasePanel):
             panel.domain = domain
+        self.call_later(self._rescan)
 
-    def _rescan(self) -> None:
+    async def _rescan(self) -> None:
         domains = scan_domains(self._root)
-        self.query_one(Sidebar).refresh_domains(domains)
+        await self.query_one(Sidebar).refresh_domains(domains, active=self._current_domain)

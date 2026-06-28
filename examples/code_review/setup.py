@@ -10,6 +10,9 @@ from typing import Any
 
 import yaml
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+import src._compat  # noqa: F401 — apply Python 3.14 / datasets compat patches
+
 from datasets import load_dataset
 from tqdm import tqdm
 

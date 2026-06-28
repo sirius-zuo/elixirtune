@@ -2,8 +2,6 @@ from textual.app import ComposeResult
 from textual.message import Message
 from textual.widget import Widget
 from textual.widgets import Button, Label, ListView, ListItem
-from textual.events import Click
-
 from tui.domain import DomainState, Status
 
 _DOT = {
@@ -36,32 +34,22 @@ class Sidebar(Widget):
         yield ListView(id="domain-list")
         yield Button("+ New Domain", id="new-domain-btn")
 
-    def refresh_domains(self, domains: list[DomainState]) -> None:
+    async def refresh_domains(self, domains: list[DomainState], active: str | None = None) -> None:
         lv = self.query_one(ListView)
-        lv.clear()
-        for d in domains:
-            dot = _DOT[d.status]
+        await lv.clear()
+        active_index = None
+        for i, d in enumerate(domains):
+            dot = "●" if d.name == active else _DOT[d.status]
             lv.append(ListItem(Label(f"{dot} {d.name}"), id=f"domain-{d.name}"))
+            if d.name == active:
+                active_index = i
+        if active_index is not None:
+            # Use call_after_refresh so items are fully mounted before setting index
+            self.call_after_refresh(lambda idx=active_index: setattr(lv, "index", idx))
 
     def on_list_view_selected(self, event: ListView.Selected) -> None:
         if event.item.id and event.item.id.startswith("domain-"):
             self.post_message(DomainSelected(event.item.id[len("domain-"):]))
-
-    def on_click(self, event: Click) -> None:
-        """Handle click on list items and select them."""
-        # Get the widget that was clicked
-        widget = event.widget
-
-        # Walk up to find the ListItem
-        listitem = widget
-        while listitem and not isinstance(listitem, ListItem):
-            listitem = listitem.parent
-
-        # If we found a ListItem, treat it as selected
-        if listitem and isinstance(listitem, ListItem) and listitem.id:
-            if listitem.id.startswith("domain-"):
-                domain_name = listitem.id[len("domain-"):]
-                self.post_message(DomainSelected(domain_name))
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "new-domain-btn":

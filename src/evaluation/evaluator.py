@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import List, Dict, Any, Tuple
 from tqdm import tqdm
 from mlx_lm import load, generate
+from mlx_lm.sample_utils import make_sampler
 from .metrics_calculator import MetricsCalculator
 
 
@@ -28,7 +29,7 @@ class ModelEvaluator:
         
         self.metrics_calculator = MetricsCalculator()
     
-    def load_test_data(self, test_data_path: str = None) -> Tuple[List[str], List[str]]:
+    def load_test_data(self, test_data_path: str = None, max_samples: int = None) -> Tuple[List[str], List[str]]:
         """Load and parse test data.
         
         Args:
@@ -62,6 +63,10 @@ class ModelEvaluator:
                 questions.append(prompt_part)
                 answers.append(answer_part)
         
+        if max_samples and len(questions) > max_samples:
+            questions = questions[:max_samples]
+            answers = answers[:max_samples]
+
         print(f"Extracted {len(questions)} test questions")
         return questions, answers
     
@@ -86,9 +91,9 @@ class ModelEvaluator:
             try:
                 # Generate response
                 response = generate(
-                    model, tokenizer, question, 
-                    max_tokens=max_tokens, 
-                    temp=temperature
+                    model, tokenizer, question,
+                    max_tokens=max_tokens,
+                    sampler=make_sampler(temp=temperature),
                 )
                 
                 # Clean response - extract only the assistant part
@@ -105,7 +110,7 @@ class ModelEvaluator:
         
         return predictions
     
-    def evaluate_model(self, model, tokenizer, questions: List[str], references: List[str]) -> Dict[str, Any]:
+    def evaluate_model(self, model, tokenizer, questions: List[str], references: List[str], max_samples: int = None) -> Dict[str, Any]:
         """Evaluate model performance.
         
         Args:
@@ -181,8 +186,8 @@ class ModelEvaluator:
         print("Model with adapters loaded successfully")
         return model, tokenizer
     
-    def evaluate_model_from_path(self, model_path: str, model_name: str = None, 
-                                test_data_path: str = None) -> Dict[str, Any]:
+    def evaluate_model_from_path(self, model_path: str, model_name: str = None,
+                                test_data_path: str = None, max_samples: int = None) -> Dict[str, Any]:
         """Evaluate a model from its path.
         
         Args:
@@ -204,26 +209,27 @@ class ModelEvaluator:
         model, tokenizer = self.load_model(model_path)
         
         # Load test data
-        questions, references = self.load_test_data(test_data_path)
-        
+        questions, references = self.load_test_data(test_data_path, max_samples=max_samples)
+
         # Evaluate model
         results = self.evaluate_model(model, tokenizer, questions, references)
-        
+
         # Print metrics summary
         self.metrics_calculator.print_metrics_summary(
-            results['metrics'], 
+            results['metrics'],
             f"{model_name} Evaluation Results"
         )
-        
+
         # Save results
         results_file = self.save_evaluation_results(results, model_name)
-        
+
         print(f"\nEvaluation completed! Results saved to: {results_file}")
-        
+
         return results
-    
-    def evaluate_model_with_adapters(self, base_model_path: str, adapter_path: str, 
-                                   model_name: str = "lora_runtime", test_data_path: str = None) -> Dict[str, Any]:
+
+    def evaluate_model_with_adapters(self, base_model_path: str, adapter_path: str,
+                                   model_name: str = "lora_runtime", test_data_path: str = None,
+                                   max_samples: int = None) -> Dict[str, Any]:
         """Evaluate base model with LoRA adapters applied at runtime.
         
         Args:
@@ -243,24 +249,24 @@ class ModelEvaluator:
         model, tokenizer = self.load_model_with_adapters(base_model_path, adapter_path)
         
         # Load test data
-        questions, references = self.load_test_data(test_data_path)
-        
+        questions, references = self.load_test_data(test_data_path, max_samples=max_samples)
+
         # Evaluate model
         results = self.evaluate_model(model, tokenizer, questions, references)
-        
+
         # Print metrics summary
         self.metrics_calculator.print_metrics_summary(
-            results['metrics'], 
+            results['metrics'],
             f"{model_name} Evaluation Results"
         )
-        
+
         # Save results
         results_file = self.save_evaluation_results(results, model_name)
-        
+
         print(f"\nEvaluation completed! Results saved to: {results_file}")
-        
+
         return results
-    
+
     def compare_models(self, model_results: List[Dict[str, Any]], model_names: List[str]):
         """Compare multiple model evaluation results.
         
@@ -320,8 +326,9 @@ class ModelEvaluator:
         
         print("="*60)
     
-    def comprehensive_model_comparison(self, base_model_path: str, adapter_path: str, 
-                                     fused_model_path: str = None, test_data_path: str = None) -> Dict[str, Any]:
+    def comprehensive_model_comparison(self, base_model_path: str, adapter_path: str,
+                                     fused_model_path: str = None, test_data_path: str = None,
+                                     max_samples: int = None) -> Dict[str, Any]:
         """Comprehensive comparison of base model, runtime adapters, and fused model.
         
         Args:
@@ -344,28 +351,28 @@ class ModelEvaluator:
         # 1. Evaluate base model
         print("\n🔸 Step 1: Evaluating Base Model")
         try:
-            base_results = self.evaluate_model_from_path(base_model_path, "base_model", test_data_path)
+            base_results = self.evaluate_model_from_path(base_model_path, "base_model", test_data_path, max_samples=max_samples)
             results["base_model"] = base_results
             model_names.append("base_model")
         except Exception as e:
             print(f"❌ Failed to evaluate base model: {e}")
-        
+
         # 2. Evaluate base model + runtime adapters
         print("\n🔸 Step 2: Evaluating Base Model + Runtime LoRA Adapters")
         try:
             runtime_results = self.evaluate_model_with_adapters(
-                base_model_path, adapter_path, "lora_runtime", test_data_path
+                base_model_path, adapter_path, "lora_runtime", test_data_path, max_samples=max_samples
             )
             results["lora_runtime"] = runtime_results
             model_names.append("lora_runtime")
         except Exception as e:
             print(f"❌ Failed to evaluate runtime adapters: {e}")
-        
+
         # 3. Evaluate fused model (if available)
         if fused_model_path and Path(fused_model_path).exists():
             print("\n🔸 Step 3: Evaluating Fused Model")
             try:
-                fused_results = self.evaluate_model_from_path(fused_model_path, "lora_fused", test_data_path)
+                fused_results = self.evaluate_model_from_path(fused_model_path, "lora_fused", test_data_path, max_samples=max_samples)
                 results["lora_fused"] = fused_results
                 model_names.append("lora_fused")
             except Exception as e:

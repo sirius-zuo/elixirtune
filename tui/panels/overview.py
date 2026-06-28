@@ -9,14 +9,18 @@ from tui.app import BasePanel
 from tui.domain import generate_runtime_configs
 from tui.runner import RunnerOutput, RunnerDone
 from tui.widgets.log_view import LogView
+from tui.widgets.section_rule import SectionRule
 
 
 class OverviewPanel(BasePanel):
     DEFAULT_CSS = "OverviewPanel { height: 100%; padding: 1; }"
 
     def compose(self) -> ComposeResult:
+        yield SectionRule("Status")
         yield Label("Select a domain.", id="overview-status")
-        yield Button("▶ Run Full Pipeline", id="run-all-btn", disabled=True)
+        yield SectionRule("Actions")
+        yield Button("▶ Run Full Pipeline", id="run-all-btn", disabled=True, variant="success")
+        yield SectionRule("Log")
         yield LogView(id="overview-log")
 
     def refresh_content(self) -> None:
@@ -100,4 +104,4 @@ class OverviewPanel(BasePanel):
             )
         else:
             self.query_one(LogView).write_line("[green]Pipeline complete.[/green]")
-            self.app._rescan()
+            self.call_later(self.app._rescan)

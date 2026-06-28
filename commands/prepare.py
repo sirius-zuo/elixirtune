@@ -21,12 +21,22 @@ def prepare(
     test_split: float = typer.Option(0.1, help="Fraction held out for test"),
     val_split: float = typer.Option(0.1, help="Fraction held out for validation"),
 ):
-    """Convert filtered JSONL from generate into train/val/test splits."""
+    """Convert filtered JSONL (or seeds) into train/val/test splits."""
     if ctx.invoked_subcommand is not None:
         return
     filtered = _ws(domain) / "generated" / "filtered.jsonl"
-    if not filtered.exists():
-        typer.echo(f"No filtered data at {filtered}. Run: generate {domain}", err=True)
+    seeds = _ws(domain) / "seeds" / "approved.jsonl"
+    if filtered.exists():
+        source = filtered
+    elif seeds.exists():
+        source = seeds
+        typer.echo(f"No generated data found; using seeds from {seeds}")
+    else:
+        typer.echo(
+            f"No data found. Expected {filtered} or {seeds}. "
+            f"Run: generate {domain}",
+            err=True,
+        )
         raise typer.Exit(1)
 
     preprocessor = DataPreprocessor(
@@ -36,7 +46,7 @@ def prepare(
     )
 
     samples = []
-    for rec in read_jsonl(filtered):
+    for rec in read_jsonl(source):
         conversation = rec["conversation"]
         for i in range(0, len(conversation) - 1, 2):
             q = conversation[i]["content"]

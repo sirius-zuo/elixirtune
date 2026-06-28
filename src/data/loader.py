@@ -1,6 +1,7 @@
 """Data loading utilities for fine-tuning pipeline."""
 
 import yaml
+import src._compat  # noqa: F401
 from datasets import load_dataset
 from pathlib import Path
 from typing import Dict, Any, List

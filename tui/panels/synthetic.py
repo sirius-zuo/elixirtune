@@ -2,7 +2,8 @@ import subprocess
 from pathlib import Path
 
 from textual.app import ComposeResult
-from textual.widgets import Button, Label, Rule
+from textual.containers import Horizontal
+from textual.widgets import Button, Label
 from textual import work
 
 from tui.app import BasePanel
@@ -10,6 +11,7 @@ from tui.domain import infer_status, Status, status_order
 from tui.runner import RunnerOutput, RunnerDone
 from tui.widgets.config_form import ConfigField, ConfigForm
 from tui.widgets.log_view import LogView
+from tui.widgets.section_rule import SectionRule
 
 _SYNTH_FIELDS = [
     ConfigField("Teacher URL", "workspaces/{domain}/config.yaml", ["teacher", "base_url"]),
@@ -25,12 +27,13 @@ class SyntheticPanel(BasePanel):
 
     def compose(self) -> ComposeResult:
         yield ConfigForm(_SYNTH_FIELDS, id="synth-config-form")
-        yield Rule()
-        yield Button("Init", id="init-btn", disabled=True)
-        yield Button("Curate", id="curate-btn", disabled=True)
-        yield Button("Generate", id="gen-btn", disabled=True)
-        yield Button("Prepare", id="prepare-btn", disabled=True)
-        yield Rule()
+        yield SectionRule("Actions")
+        with Horizontal(classes="btn-row"):
+            yield Button("Init", id="init-btn", disabled=True, variant="success")
+            yield Button("Curate", id="curate-btn", disabled=True, variant="success")
+            yield Button("Generate", id="gen-btn", disabled=True, variant="success")
+            yield Button("Prepare", id="prepare-btn", disabled=True, variant="success")
+        yield SectionRule("Log")
         yield LogView(id="synth-log")
 
     def refresh_content(self) -> None:
@@ -81,4 +84,4 @@ class SyntheticPanel(BasePanel):
                 f"[red]Failed (exit {event.exit_code})[/red]"
             )
         self.refresh_content()
-        self.app._rescan()
+        self.call_later(self.app._rescan)

@@ -3,13 +3,15 @@ import subprocess
 from pathlib import Path
 
 from textual.app import ComposeResult
-from textual.widgets import Button, Label, Rule
+from textual.containers import Horizontal
+from textual.widgets import Button, Label
 from textual import work
 
 from tui.app import BasePanel
-from tui.domain import infer_status, Status, generate_runtime_configs, status_order
-from tui.runner import RunnerOutput, RunnerDone
+from tui.domain import infer_status, Status, generate_runtime_configs, status_order, resolve_adapters_dir
+from tui.runner import RunnerOutput, RunnerDone, stream_subprocess
 from tui.widgets.log_view import LogView
+from tui.widgets.section_rule import SectionRule
 
 
 def _dir_size_mb(p: Path) -> str:
@@ -23,14 +25,16 @@ class DeploymentPanel(BasePanel):
     DEFAULT_CSS = "DeploymentPanel { height: 100%; padding: 1; }"
 
     def compose(self) -> ComposeResult:
+        yield SectionRule("Model Status")
         yield Label("Adapters: —", id="adapter-info")
         yield Label("Fused model: —", id="fused-info")
-        yield Rule()
-        yield Button("▶ Fuse & Evaluate", id="fuse-btn", disabled=True, variant="success")
-        yield Button("▶ Export GGUF", id="gguf-btn", disabled=True)
-        yield Button("Create Ollama Model", id="ollama-btn", disabled=True)
-        yield Button("Upload to HuggingFace", id="hf-upload-btn", disabled=True)
-        yield Rule()
+        yield SectionRule("Actions")
+        with Horizontal(classes="btn-row"):
+            yield Button("▶ Fuse", id="fuse-btn", disabled=True, variant="success")
+            yield Button("▶ Export GGUF", id="gguf-btn", disabled=True, variant="success")
+            yield Button("Create Ollama Model", id="ollama-btn", disabled=True, variant="success")
+            yield Button("Upload to HuggingFace", id="hf-upload-btn", disabled=True, variant="success")
+        yield SectionRule("Log")
         yield LogView(id="deploy-log")
 
     def refresh_content(self) -> None:
@@ -38,7 +42,7 @@ class DeploymentPanel(BasePanel):
             return
         ws = Path("workspaces") / self.domain
         status = infer_status(ws)
-        adapter_dir = ws / "adapters"
+        adapter_dir = resolve_adapters_dir(ws)
         fused_dir = ws / "fused"
         self.query_one("#adapter-info", Label).update(
             f"workspaces/{self.domain}/adapters   {_dir_size_mb(adapter_dir)}"
@@ -46,9 +50,12 @@ class DeploymentPanel(BasePanel):
         self.query_one("#fused-info", Label).update(
             f"workspaces/{self.domain}/fused       {_dir_size_mb(fused_dir)}"
         )
-        self.query_one("#fuse-btn", Button).disabled = (
-            status_order(status) < status_order(Status.TRAINED)
-        )
+        fuse_btn = self.query_one("#fuse-btn", Button)
+        fuse_btn.disabled = status_order(status) < status_order(Status.TRAINED)
+        if status_order(status) >= status_order(Status.DEPLOYED):
+            fuse_btn.label = "Re-Fuse (optional)"
+        else:
+            fuse_btn.label = "▶ Fuse"
         self.query_one("#ollama-btn", Button).disabled = (
             status_order(status) < status_order(Status.DEPLOYED)
         )
@@ -91,9 +98,7 @@ class DeploymentPanel(BasePanel):
         cmd = [
             "python3", "cli.py", "fuse", domain,
             "--model-config", str(ws / "runtime_model_config.yaml"),
-            "--eval-config", str(ws / "runtime_eval_config.yaml"),
-            "--test-data", str(ws / "processed" / "test.json"),
-            "--adapters-path", str(ws / "adapters"),
+            "--adapters-path", str(resolve_adapters_dir(ws)),
             "--output-path", str(ws / "fused"),
         ]
         self._stream(cmd)
@@ -101,8 +106,25 @@ class DeploymentPanel(BasePanel):
     @work(thread=True)
     def _run_ollama(self, domain: str) -> None:
         ws = Path("workspaces") / domain
+        fused_dir = ws / "fused"
+
+        # Ollama needs a .gguf file, not a directory
+        gguf_files = sorted(fused_dir.glob("*.gguf"))
+        # Prefer the quantized file (non-f16) if both exist
+        quantized = [f for f in gguf_files if "_f16" not in f.name]
+        gguf_path = (quantized or gguf_files)[0] if (quantized or gguf_files) else None
+
+        if gguf_path is None:
+            self.post_message(RunnerOutput(
+                f"No .gguf file found in {fused_dir}. "
+                "Export GGUF first using the Export GGUF button."
+            ))
+            self.post_message(RunnerDone(1))
+            return
+
+        # Ollama requires an absolute path in the FROM directive
         modelfile = ws / "Modelfile"
-        modelfile.write_text(f"FROM {ws / 'fused'}\n")
+        modelfile.write_text(f"FROM {gguf_path.resolve()}\n")
         cmd = ["ollama", "create", f"{domain}-lora", "-f", str(modelfile)]
         self._stream(cmd)
 
@@ -137,13 +159,11 @@ class DeploymentPanel(BasePanel):
         self._stream(cmd)
 
     def _stream(self, cmd: list[str]) -> None:
-        proc = subprocess.Popen(
-            cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
-        )
-        for line in proc.stdout:
-            self.post_message(RunnerOutput(line.rstrip()))
-        proc.wait()
-        self.post_message(RunnerDone(proc.returncode))
+        for line, code in stream_subprocess(cmd):
+            if line is not None:
+                self.post_message(RunnerOutput(line))
+            else:
+                self.post_message(RunnerDone(code))
 
     def on_runner_output(self, event: RunnerOutput) -> None:
         self.query_one(LogView).write_line(event.line)
@@ -156,4 +176,4 @@ class DeploymentPanel(BasePanel):
         else:
             self.query_one(LogView).write_line("[green]Done.[/green]")
         self.refresh_content()
-        self.app._rescan()
+        self.call_later(self.app._rescan)

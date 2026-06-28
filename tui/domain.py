@@ -29,6 +29,19 @@ class DomainState:
     status: Status
 
 
+def resolve_adapters_dir(ws: Path) -> Path:
+    """Return the directory containing adapter_config.json.
+
+    SFTTrainer saves adapters under {output_dir}/adapters/, so the actual
+    adapter files end up one level deeper than the configured output_dir.
+    """
+    ws = Path(ws)
+    nested = ws / "adapters" / "adapters"
+    if (nested / "adapter_config.json").exists():
+        return nested
+    return ws / "adapters"
+
+
 def infer_status(ws: Path) -> Status:
     ws = Path(ws)
     if (ws / "fused").exists() and any((ws / "fused").iterdir()):
@@ -80,7 +93,7 @@ def generate_runtime_configs(ws: Path, root: Path = Path(".")) -> None:
 
     overlay("config/model_config.yaml", {
         "paths": {
-            "adapter_dir": str(ws / "adapters"),
+            "adapter_dir": str(resolve_adapters_dir(ws)),
             "fused_model_dir": str(ws / "fused"),
             "checkpoint_dir": str(ws / "checkpoints"),
         }

@@ -19,6 +19,7 @@ def fuse(
     eval_config: Path = typer.Option(None, help="Eval config YAML (omit to skip post-fuse eval)"),
     test_data: Path = typer.Option(None, help="Test data for post-fuse eval"),
     adapters_path: Path = typer.Option(None, help="Adapters dir (default: workspaces/<domain>/adapters)"),
+    max_samples: int = typer.Option(100, help="Max test samples for post-fuse eval (default 100)"),
 ) -> None:
     """Fuse LoRA adapters into the base model and optionally evaluate the result."""
     if ctx.invoked_subcommand is not None:
@@ -43,4 +44,4 @@ def fuse(
         from evaluation.evaluator import ModelEvaluator
         test = Path(test_data) if test_data else ws / "processed" / "test.json"
         evaluator = ModelEvaluator(str(eval_config))
-        evaluator.evaluate_model_from_path(str(out), "lora_fused", str(test))
+        evaluator.evaluate_model_from_path(str(out), "lora_fused", str(test), max_samples=max_samples)

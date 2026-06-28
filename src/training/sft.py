@@ -1,6 +1,8 @@
 import json
 import yaml
 from pathlib import Path
+
+import src._compat  # noqa: F401 — apply Python 3.14 / datasets compat patches
 from datasets import Dataset
 
 from .metrics_writer import MetricsWriterCallback
@@ -36,27 +38,29 @@ def run(
     )
     model = FastLanguageModel.get_peft_model(
         model,
-        r=m_cfg["lora"]["rank"],
+        r=int(m_cfg["lora"]["rank"]),
         target_modules=m_cfg["lora"].get("keys", ["q_proj", "v_proj"]),
-        lora_alpha=m_cfg["lora"]["scale"],
-        lora_dropout=m_cfg["lora"]["dropout"],
+        lora_alpha=float(m_cfg["lora"]["scale"]),
+        lora_dropout=float(m_cfg["lora"]["dropout"]),
     )
 
-    train_ds = Dataset.from_list(json.loads(Path(train_data_path).read_text()))
-    eval_ds = (
-        Dataset.from_list(json.loads(Path(val_data_path).read_text()))
-        if val_data_path
-        else None
-    )
+    def _load(path: Path) -> Dataset:
+        raw = json.loads(path.read_text())
+        records = raw if isinstance(raw[0], dict) else [{"text": s} for s in raw]
+        return Dataset.from_list(records)
+
+    train_ds = _load(Path(train_data_path))
+    eval_ds = _load(Path(val_data_path)) if val_data_path else None
 
     sft_args = dict(
         output_dir=output_dir,
-        per_device_train_batch_size=t_cfg["training"]["batch_size"],
-        learning_rate=t_cfg["training"]["learning_rate"],
-        max_steps=t_cfg["training"]["iters"],
+        per_device_train_batch_size=int(t_cfg["training"]["batch_size"]),
+        learning_rate=float(t_cfg["training"]["learning_rate"]),
+        max_steps=int(t_cfg["training"]["iters"]),
+        dataset_text_field="text",
     )
     if eval_ds is not None:
-        sft_args["eval_steps"] = t_cfg["training"]["steps_per_eval"]
+        sft_args["eval_steps"] = int(t_cfg["training"]["steps_per_eval"])
 
     trainer = SFTTrainer(
         model=model,

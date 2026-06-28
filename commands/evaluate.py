@@ -21,6 +21,7 @@ def evaluate(
         None,
         help="Path to model config YAML (default: workspaces/<domain>/runtime_model_config.yaml)",
     ),
+    max_samples: int = typer.Option(100, help="Max test samples to evaluate (default 100 for speed)"),
 ) -> None:
     """Evaluate base model and/or fine-tuned adapters for a domain."""
     if ctx.invoked_subcommand is not None:
@@ -52,6 +53,7 @@ def evaluate(
             adapter_path=str(adapters_path),
             fused_model_path=str(fused_path) if fused_path else None,
             test_data_path=str(test_data),
+            max_samples=max_samples,
         )
     else:
-        evaluator.evaluate_model_from_path(base_model, "base_model", str(test_data))
+        evaluator.evaluate_model_from_path(base_model, "base_model", str(test_data), max_samples=max_samples)

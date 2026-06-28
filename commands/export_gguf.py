@@ -1,4 +1,4 @@
-"""Export fused model to GGUF format using mlx_lm.convert."""
+"""Export fused MLX model to GGUF format."""
 
 import shutil
 import subprocess
@@ -13,21 +13,37 @@ app = typer.Typer(context_settings={"allow_interspersed_args": True})
 
 from commands import _ws
 
+QUANTIZATIONS = ["Q4_K_M", "Q5_K_M", "Q8_0", "f16"]
 
-QUANTIZATIONS = ["Q4_K_M", "Q5_K_M", "Q8_0"]
+_BUNDLED_CONVERTER = Path(__file__).resolve().parents[1] / "src" / "utils" / "convert_qwen2_to_gguf.py"
 
 
-def _check_llama_cpp() -> bool:
-    """Check if llama.cpp is available for GGUF conversion."""
-    return shutil.which("llama-convert-hf-to-gguf.py") is not None or \
-           shutil.which("llama-export-lora") is not None
+def _find_python_with_gguf() -> Path | None:
+    """Return the first Python interpreter that has gguf + safetensors + numpy."""
+    candidates = [
+        Path("/Library/Frameworks/Python.framework/Versions/3.11/bin/python3.11"),
+        Path("/usr/local/bin/python3.11"),
+        shutil.which("python3.11") and Path(shutil.which("python3.11")),
+        Path(sys.executable),
+        shutil.which("python3") and Path(shutil.which("python3")),
+    ]
+    for py in candidates:
+        if not py or not py.exists():
+            continue
+        result = subprocess.run(
+            [str(py), "-c", "import gguf, safetensors, numpy"],
+            capture_output=True,
+        )
+        if result.returncode == 0:
+            return py
+    return None
 
 
 @app.callback(invoke_without_command=True)
 def export_gguf(
     ctx: typer.Context,
     domain: str = typer.Argument(...),
-    quantization: str = typer.Option("Q4_K_M", help="Quantization method (Q4_K_M, Q5_K_M, Q8_0)",),
+    quantization: str = typer.Option("Q4_K_M", help="Quantization: Q4_K_M, Q5_K_M, Q8_0, f16"),
     output_path: Path = typer.Option(None, help="Output GGUF file path"),
 ) -> None:
     """Export fused model to GGUF format for use with llama.cpp / Ollama."""
@@ -45,81 +61,57 @@ def export_gguf(
         typer.echo(f"Unknown quantization '{quantization}'. Choose from: {QUANTIZATIONS}", err=True)
         raise typer.Exit(1)
 
+    out_f16 = ws / "fused" / f"{domain}_f16.gguf"
     out = output_path or (ws / "fused" / f"{domain}.gguf")
 
     typer.echo(f"Exporting {domain} to GGUF ({quantization})...")
     typer.echo(f"  Input:  {fused}")
     typer.echo(f"  Output: {out}")
 
-    # Check for llama.cpp
-    if not _check_llama_cpp():
-        typer.echo("")
-        typer.echo("llama.cpp is required for GGUF export.", err=True)
-        typer.echo("Install it with: git clone https://github.com/ggerganov/llama.cpp && cd llama.cpp && make", err=True)
-        typer.echo("Then ensure llama-convert-hf-to-gguf.py or llama-export-lora is on PATH.", err=True)
-        raise typer.Exit(1)
-
-    # Try mlx_lm.convert first (preferred if available)
-    try:
-        result = subprocess.run(
-            [
-                sys.executable, "-m", "mlx_lm.convert",
-                "--model-dir", str(fused),
-                "--outfile", str(out),
-                "--quantize", quantization,
-            ],
-            check=False,
-            capture_output=False,
+    # Find Python with gguf package (needed for F16 conversion)
+    py = _find_python_with_gguf()
+    if py is None:
+        typer.echo(
+            "Could not find Python with 'gguf', 'safetensors', and 'numpy'.\n"
+            "Install them: pip install gguf safetensors numpy",
+            err=True,
         )
-        if result.returncode == 0:
-            typer.echo(f"✅ GGUF exported to: {out}")
-            return
-    except (FileNotFoundError, ModuleNotFoundError):
-        pass  # mlx_lm.convert not available, fall through
-
-    # Fallback: use llama.cpp's conversion
-    typer.echo("mlx_lm.convert not available, trying llama.cpp...")
-    convert_script = None
-    for name in ["llama-convert-hf-to-gguf.py", "llama-export-lora"]:
-        script = shutil.which(name)
-        if script:
-            convert_script = script
-            break
-
-    if not convert_script:
-        typer.echo("Neither mlx_lm.convert nor llama.cpp conversion scripts found.", err=True)
-        typer.echo("Please install one of:", err=True)
-        typer.echo("  - mlx-lm: pip install mlx-lm>=0.18 (provides mlx_lm.convert)")
-        typer.echo("  - llama.cpp: git clone https://github.com/ggerganov/llama.cpp && cd llama.cpp && make")
         raise typer.Exit(1)
+    typer.echo(f"Using Python: {py}")
 
-    # Use llama.cpp to convert
-    typer.echo(f"Using {convert_script}...")
+    # Step 1: Convert MLX quantized → F16 GGUF using bundled converter
+    typer.echo("Step 1: Converting MLX 4-bit model to F16 GGUF...")
     result = subprocess.run(
-        [sys.executable, convert_script, str(fused), "--outfile", str(out), "--outtype", "f16"],
+        [str(py), str(_BUNDLED_CONVERTER), str(fused), str(out_f16)],
         check=False,
-        capture_output=False,
     )
-
     if result.returncode != 0:
-        typer.echo(f"GGUF export failed.", err=True)
+        typer.echo("F16 GGUF conversion failed.", err=True)
         raise typer.Exit(1)
 
-    # Quantize if needed (llama.cpp converts to f16 by default)
-    if quantization != "Q8_0":
-        quantize = shutil.which("llama-quantize") or shutil.which("quantize")
-        if quantize:
-            typer.echo(f"Quantizing to {quantization}...")
-            result = subprocess.run(
-                [quantize, str(out), str(out), quantization],
-                check=False,
-                capture_output=False,
-            )
-            if result.returncode != 0:
-                typer.echo(f"Quantization failed.", err=True)
-                raise typer.Exit(1)
-        else:
-            typer.echo("llama-quantize not found. Output is f16. Install llama.cpp for quantization.",
-                       err=True)
+    # Step 2: Quantize to target format (unless f16 was requested)
+    if quantization == "f16":
+        out_f16.rename(out)
+        typer.echo(f"✅ GGUF exported to: {out}")
+        return
 
+    quantize_bin = shutil.which("llama-quantize")
+    if not quantize_bin:
+        typer.echo(
+            f"llama-quantize not on PATH. F16 GGUF saved at: {out_f16}\n"
+            "Install: brew install llama.cpp",
+            err=True,
+        )
+        raise typer.Exit(1)
+
+    typer.echo(f"Step 2: Quantizing to {quantization}...")
+    result = subprocess.run(
+        [quantize_bin, str(out_f16), str(out), quantization],
+        check=False,
+    )
+    if result.returncode != 0:
+        typer.echo("Quantization failed.", err=True)
+        raise typer.Exit(1)
+
+    out_f16.unlink(missing_ok=True)
     typer.echo(f"✅ GGUF exported to: {out}")
