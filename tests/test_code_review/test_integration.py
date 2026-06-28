@@ -15,9 +15,6 @@ def test_full_pipeline_on_tiny_subset(tmp_path):
     2. prepare command can consume them
     3. Output has expected train/val/test structure
     """
-    import subprocess
-    import yaml
-
     # Create a tiny synthetic dataset to simulate what setup.py would download
     fake_dataset = [
         {
@@ -63,15 +60,6 @@ def test_full_pipeline_on_tiny_subset(tmp_path):
             "new_line": 1,
         },
     ]
-
-    # Write fake dataset for setup.py to consume
-    fake_dataset_path = tmp_path / "data" / "code-review" / "fake_dataset.jsonl"
-    fake_dataset_path.parent.mkdir(parents=True)
-    for record in fake_dataset:
-        fake_dataset_path.write_text(
-            "\n".join(json.dumps(r, ensure_ascii=False) for r in fake_dataset) + "\n",
-            encoding="utf-8",
-        )
 
     # Import and run setup's conversion with a custom dataset path
     # We need to patch the dataset loading since we can't actually download

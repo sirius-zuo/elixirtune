@@ -8,6 +8,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 from datasets import load_dataset
 from tqdm import tqdm
 
@@ -154,7 +156,6 @@ def convert_dataset(
             },
         },
     }
-    import yaml
     config_path = ws / "config.yaml"
     config_path.write_text(
         yaml.safe_dump(config, default_flow_style=False, sort_keys=False),

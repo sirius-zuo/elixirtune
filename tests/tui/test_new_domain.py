@@ -29,10 +29,9 @@ async def test_radio_options_present():
         assert "rb-code-review" in ids
 
 
-async def test_code_review_creates_workspace(tmp_path):
+async def test_code_review_creates_workspace(tmp_path, monkeypatch):
     """Code review selection should call setup.py with --domain."""
-    import os
-    os.chdir(tmp_path)
+    monkeypatch.chdir(tmp_path)
     async with NewDomainApp().run_test() as pilot:
         await pilot.pause()
         screen = pilot.app.screen

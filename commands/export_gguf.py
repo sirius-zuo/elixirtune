@@ -20,8 +20,7 @@ QUANTIZATIONS = ["Q4_K_M", "Q5_K_M", "Q8_0"]
 def _check_llama_cpp() -> bool:
     """Check if llama.cpp is available for GGUF conversion."""
     return shutil.which("llama-convert-hf-to-gguf.py") is not None or \
-           shutil.which("llama-export-lora") is not None or \
-           (shutil.which("python3") and Path(shutil.which("python3").replace("python3", "llama-convert-hf-to-gguf.py")).exists())
+           shutil.which("llama-export-lora") is not None
 
 
 @app.callback(invoke_without_command=True)
@@ -64,7 +63,7 @@ def export_gguf(
     try:
         result = subprocess.run(
             [
-                "python3", "-m", "mlx_lm.convert",
+                sys.executable, "-m", "mlx_lm.convert",
                 "--model-dir", str(fused),
                 "--outfile", str(out),
                 "--quantize", quantization,
