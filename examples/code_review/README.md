@@ -39,6 +39,15 @@ from pathlib import Path
 - Hugging Face account + token (for downloading the dataset and base model)
 - `llama.cpp` (optional, only if you want GGUF export)
 
+### Virtual Environment
+
+All dependencies are already listed in `requirements.txt` and included in the
+project `.venv`. Activate it before running any commands:
+
+```bash
+source .venv/bin/activate
+```
+
 ## Quick Start
 
 The simplest path is via the guided TUI:
