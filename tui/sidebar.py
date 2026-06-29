@@ -5,12 +5,6 @@ from textual.widget import Widget
 from textual.widgets import Button, Label, ListView, ListItem, Rule
 from tui.domain import DomainState, Status
 
-_DOT = {
-    Status.DEPLOYED: "●", Status.EVALUATED: "●",
-    Status.TRAINED: "◉", Status.PREPARED: "◉", Status.GENERATED: "◉",
-    Status.SEEDED: "○", Status.EMPTY: "○",
-}
-
 
 class DomainSelected(Message):
     def __init__(self, domain: str) -> None:
@@ -45,16 +39,30 @@ class Sidebar(Widget):
         yield Rule()
 
     async def refresh_domains(self, domains: list[DomainState], active: str | None = None) -> None:
+        self._active = active
         lv = self.query_one(ListView)
         await lv.clear()
         active_index = None
         for i, d in enumerate(domains):
-            dot = "●" if d.name == active else _DOT[d.status]
-            lv.append(ListItem(Label(f"{dot} {d.name}"), id=f"domain-{d.name}"))
+            dot = "●" if d.name == active else "○"
+            mark = " [b white]✓[/]" if d.status in (Status.DEPLOYED, Status.EVALUATED) else ""
+            lv.append(ListItem(Label(f"{dot} {d.name}{mark}"), id=f"domain-{d.name}"))
             if d.name == active:
                 active_index = i
         if active_index is not None:
             self.call_after_refresh(lambda idx=active_index: setattr(lv, "index", idx))
+
+    def on_list_view_highlighted(self, event: ListView.Highlighted) -> None:
+        # Arrow-key navigation switches the active domain immediately. Skip the
+        # programmatic re-highlight of the already-active domain to avoid a loop.
+        item = event.item
+        if item is None or not item.id or not item.id.startswith("domain-"):
+            return
+        name = item.id[len("domain-"):]
+        if name == getattr(self, "_active", None):
+            return
+        self._active = name
+        self.post_message(DomainSelected(name))
 
     def on_list_view_selected(self, event: ListView.Selected) -> None:
         if event.item.id and event.item.id.startswith("domain-"):
