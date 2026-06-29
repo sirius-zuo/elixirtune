@@ -31,6 +31,38 @@ def test_dpo_raises_without_correct_data(tmp_path):
             tmp_path / "train.json", None)
 
 
+def test_dpo_trains_on_valid_preference_data(tmp_path):
+    """DPOTrainer is built with the configured beta from {prompt,chosen,rejected} data."""
+    pytest.importorskip("mlx_tune")  # training backend; skip when not installed
+    import sys
+    sys.path.insert(0, str(Path(__file__).parent.parent))
+    model_cfg = tmp_path / "model.yaml"
+    model_cfg.write_text(
+        "base_model:\n  path: m\nlora:\n  rank: 4\n  scale: 8.0\n  dropout: 0.0\n  keys: [q_proj]\n"
+    )
+    train_cfg = tmp_path / "train.yaml"
+    train_cfg.write_text(
+        "training:\n  batch_size: 2\n  learning_rate: 1e-5\n  iters: 10\n  steps_per_eval: 5\n"
+        "dpo:\n  beta: 0.2\n"
+    )
+    train_data = tmp_path / "dpo.json"
+    train_data.write_text(json.dumps([{"prompt": "p", "chosen": "c", "rejected": "r"}]))
+
+    # Mock model load + trainer (no real training), but use the REAL DPOConfig so
+    # the test actually exercises the mlx_tune API surface dpo.py depends on.
+    with patch("mlx_tune.FastLanguageModel") as flm, \
+         patch("mlx_tune.DPOTrainer") as trainer:
+        flm.from_pretrained.return_value = (MagicMock(), MagicMock())
+        flm.get_peft_model.return_value = MagicMock()
+        from src.training.dpo import run
+        run("d", model_cfg, train_cfg, train_data, None)
+
+    _, kwargs = trainer.call_args
+    assert kwargs["args"].beta == 0.2            # configured beta on a real DPOConfig
+    assert "eval_dataset" not in kwargs          # DPOTrainer has no eval dataset
+    trainer.return_value.train.assert_called_once()
+
+
 def test_grpo_raises_without_correct_data(tmp_path):
     from src.training.grpo import run
     with pytest.raises(ValueError, match="GRPO requires"):
