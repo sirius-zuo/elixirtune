@@ -27,9 +27,14 @@ def test_run_generate_produces_filtered_contract(tmp_path):
     ws = tmp_path / "workspaces" / "code_review"
     write_jsonl(ws / "seeds" / "approved.jsonl",
                 [make_record("seed code", "seed review", {"source": "bootstrap"})])
-    gen = json.dumps({"reasoning": "", "user": "new code", "assistant": "new review", "category": "bug"})
-    teacher = FakeTeacher(responses=[gen, "5", gen, "5"])   # gen, miss, gen → 2 raw; 1 survives dedup → judged 5
-    embedder = FakeEmbedder({"new review": [1.0, 0.0]})
+    topics = "scenario alpha\nscenario beta"
+    batch = json.dumps([
+        {"reasoning": "", "user": "code 1", "assistant": "review one"},
+        {"reasoning": "", "user": "code 2", "assistant": "review two"},
+    ])
+    # plan_topics, one batch (2 pairs), then two judge scores
+    teacher = FakeTeacher(responses=[topics, batch, "5", "5"])
+    embedder = FakeEmbedder({"review one": [1.0, 0.0], "review two": [0.0, 1.0]})
     run_dir = run_generate("code_review", _cfg(), teacher, embedder, root=tmp_path,
                            now="2026-06-25T14-30")
     assert (run_dir / "manifest.json").exists()
@@ -43,8 +48,10 @@ def test_run_generate_resumes_from_existing_raw(tmp_path):
     # Pre-seed one raw record so only one more is needed for target_size=2.
     write_jsonl(ws / "generated" / "raw.jsonl",
                 [make_record("old", "old review", {"source": "fewshot", "category": "bug"})])
-    gen = json.dumps({"reasoning": "", "user": "n", "assistant": "fresh review", "category": "bug"})
-    teacher = FakeTeacher(responses=[gen, "5", "5"])      # ONE generation call + judges
+    topics = "scenario alpha\nscenario beta"
+    batch = json.dumps([{"reasoning": "", "user": "n", "assistant": "fresh review"}])
+    # plan_topics, one batch, then judge scores for the two kept records
+    teacher = FakeTeacher(responses=[topics, batch, "5", "5"])
     embedder = FakeEmbedder({"old review": [1.0, 0.0], "fresh review": [0.0, 1.0]})
     run_generate("code_review", _cfg(), teacher, embedder, root=tmp_path, now="t1")
     raw = read_jsonl(ws / "generated" / "raw.jsonl")

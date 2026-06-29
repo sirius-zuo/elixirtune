@@ -10,6 +10,8 @@ generate:
   fewshot_k: 4
   cot: true
   max_miss_factor: 5
+  batch_size: 5        # distinct pairs requested per teacher call
+  num_topics: 40       # diverse sub-topics planned per run to steer generation
 refine:
   passes: []
   self_refine: {model: qwen3.6}
