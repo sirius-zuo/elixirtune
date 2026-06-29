@@ -1,4 +1,5 @@
 from textual.app import ComposeResult
+from textual.containers import Vertical
 from textual.message import Message
 from textual.widget import Widget
 from textual.widgets import Button, Label, ListView, ListItem
@@ -21,18 +22,26 @@ class NewDomainRequested(Message):
     pass
 
 
+class DeleteDomainRequested(Message):
+    pass
+
+
 class Sidebar(Widget):
     DEFAULT_CSS = """
     Sidebar { width: 22; dock: left; border-right: solid $primary; }
     #sidebar-title { text-style: bold; padding: 1 1 0 1; }
     #domain-list { height: 1fr; }
-    #new-domain-btn { dock: bottom; width: 100%; }
+    #sidebar-btns { dock: bottom; height: auto; }
+    #sidebar-btns Button { width: 100%; }
+    #new-domain-btn { margin-bottom: 1; }
     """
 
     def compose(self) -> ComposeResult:
         yield Label("DOMAINS", id="sidebar-title")
         yield ListView(id="domain-list")
-        yield Button("+ New Domain", id="new-domain-btn")
+        with Vertical(id="sidebar-btns"):
+            yield Button("+ New Domain", id="new-domain-btn", variant="success")
+            yield Button("− Delete Domain", id="delete-domain-btn", variant="success")
 
     async def refresh_domains(self, domains: list[DomainState], active: str | None = None) -> None:
         lv = self.query_one(ListView)
@@ -44,7 +53,6 @@ class Sidebar(Widget):
             if d.name == active:
                 active_index = i
         if active_index is not None:
-            # Use call_after_refresh so items are fully mounted before setting index
             self.call_after_refresh(lambda idx=active_index: setattr(lv, "index", idx))
 
     def on_list_view_selected(self, event: ListView.Selected) -> None:
@@ -54,3 +62,5 @@ class Sidebar(Widget):
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "new-domain-btn":
             self.post_message(NewDomainRequested())
+        elif event.button.id == "delete-domain-btn":
+            self.post_message(DeleteDomainRequested())

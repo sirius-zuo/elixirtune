@@ -179,12 +179,15 @@ ConfigForm .preset-save-row #cfg-save-preset { width: auto; }
             for f in self._fields
         }
         (PRESET_DIR / f"{filename}.yaml").write_text(yaml.safe_dump(preset_data))
-        # Write through to actual config files
+        # Write through to actual config files — skip empty values so defaults stay in effect
         for f in self._fields:
+            val = preset_data[f.label]
+            if val == "":
+                continue
             yaml_file = f.yaml_file.format(domain=self._domain)
             path = Path(yaml_file)
             existing = yaml.safe_load(path.read_text()) if path.exists() else {}
-            updated = _set_nested(existing, f.key_path, preset_data[f.label])
+            updated = _set_nested(existing, f.key_path, val)
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(yaml.safe_dump(updated))
         select = self.query_one("#preset-select", Select)

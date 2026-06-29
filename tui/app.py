@@ -6,7 +6,7 @@ from textual.widget import Widget
 from textual.widgets import Header, TabbedContent, TabPane
 
 from tui.domain import scan_domains
-from tui.sidebar import Sidebar, DomainSelected, NewDomainRequested
+from tui.sidebar import Sidebar, DomainSelected, NewDomainRequested, DeleteDomainRequested
 
 
 class BasePanel(Widget):
@@ -82,9 +82,38 @@ class ElixirLoRAApp(App):
         if event.domain != self._current_domain:
             self._switch_domain(event.domain)
 
+    def on_delete_domain_requested(self, _: DeleteDomainRequested) -> None:
+        from tui.delete_domain import DeleteDomainScreen
+        domains = [d.name for d in scan_domains(self._root)]
+        if not domains:
+            self.notify("No domains to delete.", severity="warning")
+            return
+
+        def _on_deleted(result: dict | None) -> None:
+            if not result:
+                return
+            deleted = result["deleted"]
+            self.notify(f"Domain '{deleted}' deleted.")
+            if self._current_domain == deleted:
+                self._current_domain = None
+                for panel in self.query(BasePanel):
+                    panel.domain = None
+            self.call_later(self._rescan)
+
+        self.push_screen(DeleteDomainScreen(domains=domains, root=self._root), _on_deleted)
+
     def on_new_domain_requested(self, _: NewDomainRequested) -> None:
         from tui.new_domain import NewDomainScreen
-        self.push_screen(NewDomainScreen(root=self._root))
+
+        def _on_created(result: dict | None) -> None:
+            if not result:
+                return
+            if result.get("success"):
+                self._switch_domain(result["name"])
+            else:
+                self.notify(result.get("error", "Failed to create domain."), severity="error")
+
+        self.push_screen(NewDomainScreen(root=self._root), _on_created)
 
     def on_tabbed_content_tab_activated(self, event: TabbedContent.TabActivated) -> None:
         for panel in event.pane.query(BasePanel):

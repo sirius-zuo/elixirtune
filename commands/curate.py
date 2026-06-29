@@ -17,5 +17,12 @@ def curate(ctx: typer.Context, domain: str = typer.Argument(...)):
         return
     cand = _ws(domain) / "seeds" / "candidates.jsonl"
     approved = _ws(domain) / "seeds" / "approved.jsonl"
+    seeds = read_jsonl(cand) if cand.exists() else []
+    if not seeds:
+        typer.echo(
+            f"candidates.jsonl is empty — add seed examples to {cand} first.",
+            err=True,
+        )
+        raise typer.Exit(1)
     shutil.copyfile(cand, approved)
-    typer.echo(f"Approved {len(read_jsonl(approved))} seeds → {approved}")
+    typer.echo(f"Approved {len(seeds)} seeds → {approved}")

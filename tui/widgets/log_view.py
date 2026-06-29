@@ -4,6 +4,7 @@ from textual.app import ComposeResult
 from textual.widget import Widget
 from textual.widgets import TextArea
 
+_ANSI_RE = re.compile(r'\x1b\[[0-9;]*[A-Za-z]')
 _MARKUP_RE = re.compile(r'\[/?[^\]]*\]')
 
 
@@ -17,10 +18,10 @@ class LogView(Widget):
         self._dirty = False
 
     def compose(self) -> ComposeResult:
-        yield TextArea("", id="log-output", read_only=True)
+        yield TextArea("", id="log-output", read_only=True, soft_wrap=False)
 
     def write_line(self, text: str) -> None:
-        plain = _MARKUP_RE.sub("", text)
+        plain = _ANSI_RE.sub("", _MARKUP_RE.sub("", text))
         is_overwrite = plain.startswith("\r")
         plain = plain.lstrip("\r")
         if not plain.strip():
