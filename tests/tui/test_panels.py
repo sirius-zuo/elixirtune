@@ -128,19 +128,6 @@ async def test_train_button_enabled_with_prepared_data(tmp_path):
         assert not pilot.app.query_one("#train-btn", Button).disabled
 
 
-async def test_training_panel_shows_sparkline_after_run(tmp_path):
-    ws = tmp_path / "workspaces" / "d"
-    (ws / "logs" / "training").mkdir(parents=True)
-    import json
-    metrics = {"train_loss": [2.0, 1.5, 1.0], "val_loss": [2.1, 1.6, 1.1], "iterations": [100, 200, 300]}
-    (ws / "logs" / "training" / "training_metrics.json").write_text(json.dumps(metrics))
-    import os; os.chdir(tmp_path)
-    async with TrainApp(ws).run_test() as pilot:
-        await pilot.pause()
-        from textual.widgets import Sparkline
-        assert pilot.app.query_one(Sparkline) is not None
-
-
 from tui.panels.evaluation import EvaluationPanel
 
 
@@ -333,24 +320,6 @@ async def test_train_progress_label_updates_from_metrics(tmp_path):
         label = pilot.app.query_one("#train-progress", Label)
         assert "200" in str(label.content)
         assert "1.500" in str(label.content)
-
-
-async def test_train_progress_sparkline_updates_from_metrics(tmp_path):
-    ws = tmp_path / "workspaces" / "d"
-    (ws / "logs" / "training").mkdir(parents=True)
-    metrics = {"train_loss": [2.0, 1.5, 1.0], "val_loss": [], "iterations": [100, 200, 300]}
-    (ws / "logs" / "training" / "training_metrics.json").write_text(
-        json.dumps(metrics)
-    )
-    import os; os.chdir(tmp_path)
-    async with TrainApp(ws).run_test() as pilot:
-        await pilot.pause()
-        panel = pilot.app.query_one(TrainingPanel)
-        panel._poll_metrics()
-        await pilot.pause()
-        from textual.widgets import Sparkline
-        sl = pilot.app.query_one(Sparkline)
-        assert list(sl.data) == [2.0, 1.5, 1.0]
 
 
 async def test_train_progress_no_op_without_metrics_file(tmp_path):

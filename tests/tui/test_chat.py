@@ -4,7 +4,7 @@ import pytest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 from textual.app import App, ComposeResult
-from textual.widgets import Button, Input, Label, RichLog
+from textual.widgets import Button, Input, Label, TextArea
 
 from tui.panels.chat import ChatPanel, AssistantStart, TokenOutput
 
@@ -74,13 +74,13 @@ async def test_chat_domain_switch_clears_log(tmp_path):
     os.chdir(tmp_path)
     async with ChatApp(ws).run_test() as pilot:
         await pilot.pause()
-        log = pilot.app.query_one("#chat-log", RichLog)
-        log.write("some old message")
+        log = pilot.app.query_one("#chat-log", TextArea)
+        log.load_text("some old message")
         panel = pilot.app.query_one(ChatPanel)
         panel.domain = None
         await pilot.pause()
         # Log should be cleared and Send disabled
-        assert not log.lines
+        assert log.text == ""
         assert pilot.app.query_one("#chat-send", Button).disabled
 
 

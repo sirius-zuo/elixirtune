@@ -16,8 +16,8 @@ class SidebarApp(App):
     def compose(self) -> ComposeResult:
         yield Sidebar(id="sidebar")
 
-    def on_mount(self) -> None:
-        self.query_one(Sidebar).refresh_domains(_make_domains())
+    async def on_mount(self) -> None:
+        await self.query_one(Sidebar).refresh_domains(_make_domains())
 
 
 async def test_sidebar_renders_domain_names():
@@ -39,6 +39,7 @@ async def test_sidebar_click_emits_domain_selected():
             received.append(e.domain)
 
     async with App2().run_test() as pilot:
+        await pilot.pause()
         await pilot.click("#domain-alpha")
         await pilot.pause()
         assert "alpha" in received

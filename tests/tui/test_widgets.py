@@ -53,7 +53,8 @@ async def test_config_form_save_writes_yaml(tmp_path, monkeypatch):
 
     async with CfgApp(fields, domain="d").run_test() as pilot:
         pilot.app.query_one("#cfg-model").value = "new-model"
-        await pilot.click("#cfg-save")
+        pilot.app.query_one("#preset-name").value = "mypreset"   # saving requires a preset name
+        await pilot.click("#cfg-save-preset")
         await pilot.pause()
 
     written = yaml.safe_load(cfg.read_text())

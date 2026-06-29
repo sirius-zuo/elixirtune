@@ -40,6 +40,7 @@ def test_grpo_raises_without_correct_data(tmp_path):
 
 def test_sft_does_not_pass_eval_steps_without_eval_dataset(tmp_path):
     """SFTConfig must not include eval_steps when val_data_path is None."""
+    pytest.importorskip("mlx_tune")  # training backend; skip when not installed
     import sys
     sys.path.insert(0, str(Path(__file__).parent.parent))
     model_cfg = tmp_path / "model.yaml"
