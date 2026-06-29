@@ -4,7 +4,7 @@ from pathlib import Path
 
 from textual.app import ComposeResult
 from textual.containers import Horizontal
-from textual.widgets import Button, Label
+from textual.widgets import Button, Label, Rule
 from textual import work
 
 from tui.app import BasePanel
@@ -24,7 +24,10 @@ _SYNTH_FIELDS = [
 
 
 class SyntheticPanel(BasePanel):
-    DEFAULT_CSS = "SyntheticPanel { height: 100%; padding: 1; }"
+    DEFAULT_CSS = """
+    SyntheticPanel { height: 100%; padding: 1 1 0 1; }
+    SyntheticPanel #synth-config-form { height: auto; max-height: 50%; overflow-y: auto; }
+    """
 
     def compose(self) -> ComposeResult:
         yield ConfigForm(_SYNTH_FIELDS, id="synth-config-form")
@@ -36,6 +39,7 @@ class SyntheticPanel(BasePanel):
             yield Button("Prepare", id="prepare-btn", disabled=True, variant="success")
         yield SectionRule("Log")
         yield LogView(id="synth-log")
+        yield Rule()
 
     def refresh_content(self) -> None:
         if not self.domain:

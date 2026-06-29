@@ -4,7 +4,7 @@ from pathlib import Path
 
 from textual.app import ComposeResult
 from textual.containers import Horizontal
-from textual.widgets import Button, Label
+from textual.widgets import Button, Label, Rule
 from textual import work
 
 from tui.app import BasePanel
@@ -22,7 +22,7 @@ def _dir_size_mb(p: Path) -> str:
 
 
 class DeploymentPanel(BasePanel):
-    DEFAULT_CSS = "DeploymentPanel { height: 100%; padding: 1; }"
+    DEFAULT_CSS = "DeploymentPanel { height: 100%; padding: 1 1 0 1; }"
 
     def compose(self) -> ComposeResult:
         yield SectionRule("Model Status")
@@ -36,6 +36,7 @@ class DeploymentPanel(BasePanel):
             yield Button("Upload to HuggingFace", id="hf-upload-btn", disabled=True, variant="success")
         yield SectionRule("Log")
         yield LogView(id="deploy-log")
+        yield Rule()
 
     def refresh_content(self) -> None:
         if not self.domain:

@@ -5,7 +5,7 @@ from textual.app import ComposeResult
 from textual.containers import Horizontal
 from textual.message import Message
 from textual import work
-from textual.widgets import Button, Input, Label, TextArea
+from textual.widgets import Button, Input, Label, Rule, TextArea
 
 from tui.app import BasePanel
 from tui.runner import RunnerDone
@@ -36,7 +36,7 @@ class TokenOutput(Message):
 
 class ChatPanel(BasePanel):
     DEFAULT_CSS = """
-    ChatPanel { height: 100%; padding: 1; }
+    ChatPanel { height: 100%; padding: 1 1 0 1; }
     #chat-log { height: 1fr; border: solid #0178D4; }
     #chat-input-row { height: 3; }
     #chat-input-row Input { width: 1fr; }
@@ -57,6 +57,7 @@ class ChatPanel(BasePanel):
         with Horizontal(id="chat-input-row"):
             yield Input(id="chat-input", placeholder="Type a message…")
             yield Button("Send", id="chat-send", disabled=True, variant="success")
+        yield Rule()
 
     def watch_domain(self, domain: str | None) -> None:
         self.refresh_content()

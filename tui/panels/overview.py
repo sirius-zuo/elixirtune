@@ -3,7 +3,7 @@ from pathlib import Path
 
 from textual import work
 from textual.app import ComposeResult
-from textual.widgets import Button, Label
+from textual.widgets import Button, Label, Rule
 
 from tui.app import BasePanel
 from tui.domain import generate_runtime_configs
@@ -13,7 +13,7 @@ from tui.widgets.section_rule import SectionRule
 
 
 class OverviewPanel(BasePanel):
-    DEFAULT_CSS = "OverviewPanel { height: 100%; padding: 1; }"
+    DEFAULT_CSS = "OverviewPanel { height: 100%; padding: 1 1 0 1; }"
 
     def compose(self) -> ComposeResult:
         yield SectionRule("Status")
@@ -22,6 +22,7 @@ class OverviewPanel(BasePanel):
         yield Button("▶ Run Full Pipeline", id="run-all-btn", disabled=True, variant="success")
         yield SectionRule("Log")
         yield LogView(id="overview-log")
+        yield Rule()
 
     def refresh_content(self) -> None:
         if not self.domain:

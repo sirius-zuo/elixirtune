@@ -39,6 +39,7 @@ class ElixirLoRAApp(App):
     Button.-success:disabled { background: #1a4a6b; color: #555555; }
     .btn-row { height: auto; }
     .btn-row Button { margin-right: 2; }
+    Rule { color: #0178D4; margin: 0; }
     """
 
     def __init__(

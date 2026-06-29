@@ -6,7 +6,7 @@ from pathlib import Path
 import yaml
 from textual.app import ComposeResult
 from textual.containers import Horizontal
-from textual.widgets import Button, Label, Sparkline
+from textual.widgets import Button, Label, Rule
 from textual import work
 
 from tui.app import BasePanel
@@ -25,7 +25,11 @@ _TRAIN_FIELDS = [
 
 
 class TrainingPanel(BasePanel):
-    DEFAULT_CSS = "TrainingPanel { height: 100%; padding: 1; }"
+    DEFAULT_CSS = """
+    TrainingPanel { height: 100%; padding: 1 1 0 1; }
+    TrainingPanel #train-config-form { height: auto; max-height: 40%; overflow-y: auto; }
+    TrainingPanel #train-summary { height: auto; }
+    """
 
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
@@ -40,9 +44,9 @@ class TrainingPanel(BasePanel):
             yield Button("Prepare data", id="prepare-data-btn", disabled=True, variant="success")
             yield Button("▶ Train", id="train-btn", disabled=True, variant="success")
         yield SectionRule("Log")
-        yield LogView(id="train-log")
         yield Label("", id="train-progress")
-        yield Sparkline([], id="loss-sparkline", summary_function=min)
+        yield LogView(id="train-log")
+        yield Rule()
 
     def refresh_content(self) -> None:
         if not self.domain:
@@ -55,17 +59,7 @@ class TrainingPanel(BasePanel):
         self.query_one("#train-btn", Button).disabled = (
             status_order(status) < status_order(Status.PREPARED)
         )
-        self._load_sparkline(ws)
         self._load_training_summary(ws)
-
-    def _load_sparkline(self, ws: Path) -> None:
-        metrics_file = ws / "logs" / "training" / "training_metrics.json"
-        if metrics_file.exists():
-            try:
-                metrics = json.loads(metrics_file.read_text())
-                self.query_one(Sparkline).data = metrics.get("train_loss", [])
-            except (json.JSONDecodeError, OSError):
-                pass
 
     def _load_training_summary(self, ws: Path) -> None:
         label = self.query_one("#train-summary", Label)
@@ -162,8 +156,6 @@ class TrainingPanel(BasePanel):
         train_loss = metrics.get("train_loss", [])
         val_loss = metrics.get("val_loss", [])
         iters = metrics.get("iterations", [])
-        if train_loss:
-            self.query_one(Sparkline).data = train_loss
         if iters and train_loss:
             tl = f"{train_loss[-1]:.3f}"
             vl = f"{val_loss[-1]:.3f}" if val_loss else "—"

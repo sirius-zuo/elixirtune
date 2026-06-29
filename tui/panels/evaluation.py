@@ -4,7 +4,7 @@ from pathlib import Path
 
 from textual.app import ComposeResult
 from textual.containers import Horizontal
-from textual.widgets import Button, DataTable
+from textual.widgets import Button, DataTable, Rule
 from textual import work
 
 from tui.app import BasePanel
@@ -15,7 +15,7 @@ from tui.widgets.section_rule import SectionRule
 
 
 class EvaluationPanel(BasePanel):
-    DEFAULT_CSS = "EvaluationPanel { height: 100%; padding: 1; }"
+    DEFAULT_CSS = "EvaluationPanel { height: 100%; padding: 1 1 0 1; }"
 
     def compose(self) -> ComposeResult:
         yield SectionRule("Run Evaluation")
@@ -28,6 +28,7 @@ class EvaluationPanel(BasePanel):
         yield dt
         yield SectionRule("Log")
         yield LogView(id="eval-log")
+        yield Rule()
 
     def refresh_content(self) -> None:
         if not self.domain:

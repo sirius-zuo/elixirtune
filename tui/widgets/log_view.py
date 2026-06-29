@@ -9,7 +9,7 @@ _MARKUP_RE = re.compile(r'\[/?[^\]]*\]')
 
 
 class LogView(Widget):
-    DEFAULT_CSS = "LogView { height: 1fr; border: solid #0178D4; }"
+    DEFAULT_CSS = "LogView { height: 1fr; border: tall #0178D4; }"
 
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)

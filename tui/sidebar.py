@@ -2,7 +2,7 @@ from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.message import Message
 from textual.widget import Widget
-from textual.widgets import Button, Label, ListView, ListItem
+from textual.widgets import Button, Label, ListView, ListItem, Rule
 from tui.domain import DomainState, Status
 
 _DOT = {
@@ -31,7 +31,7 @@ class Sidebar(Widget):
     Sidebar { width: 22; dock: left; border-right: solid $primary; }
     #sidebar-title { text-style: bold; padding: 1 1 0 1; }
     #domain-list { height: 1fr; }
-    #sidebar-btns { dock: bottom; height: auto; }
+    #sidebar-btns { height: auto; }
     #sidebar-btns Button { width: 100%; }
     #new-domain-btn { margin-bottom: 1; }
     """
@@ -42,6 +42,7 @@ class Sidebar(Widget):
         with Vertical(id="sidebar-btns"):
             yield Button("+ New Domain", id="new-domain-btn", variant="success")
             yield Button("− Delete Domain", id="delete-domain-btn", variant="success")
+        yield Rule()
 
     async def refresh_domains(self, domains: list[DomainState], active: str | None = None) -> None:
         lv = self.query_one(ListView)
