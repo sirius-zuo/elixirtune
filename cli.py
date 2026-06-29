@@ -14,7 +14,7 @@ from commands.fuse     import app as fuse_app
 from commands.export_gguf import app as export_gguf_app
 from commands.chat     import app as chat_app
 
-app = typer.Typer()
+app = typer.Typer(pretty_exceptions_enable=False)
 app.add_typer(init_app,     name="init")
 app.add_typer(curate_app,   name="curate")
 app.add_typer(generate_app, name="generate")

@@ -18,7 +18,7 @@ class LogView(Widget):
         self._dirty = False
 
     def compose(self) -> ComposeResult:
-        yield TextArea("", id="log-output", read_only=True, soft_wrap=False)
+        yield TextArea("", id="log-output", read_only=True, soft_wrap=True)
 
     def write_line(self, text: str) -> None:
         plain = _ANSI_RE.sub("", _MARKUP_RE.sub("", text))
