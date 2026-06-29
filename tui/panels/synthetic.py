@@ -19,6 +19,8 @@ _SYNTH_FIELDS = [
     ConfigField("Model", "workspaces/{domain}/config.yaml", ["teacher", "model"]),
     ConfigField("API Key", "workspaces/{domain}/config.yaml", ["teacher", "api_key"], password=True),
     ConfigField("Target size", "workspaces/{domain}/config.yaml", ["generate", "target_size"]),
+    ConfigField("Batch size", "workspaces/{domain}/config.yaml", ["generate", "batch_size"]),
+    ConfigField("Topics", "workspaces/{domain}/config.yaml", ["generate", "num_topics"]),
     ConfigField("Judge cutoff", "workspaces/{domain}/config.yaml", ["filter", "judge", "score_cutoff"]),
 ]
 
