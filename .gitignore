@@ -6,3 +6,4 @@ __pycache__/
 .codegraph/
 .worktrees/
 workspaces/
+config/presets/
