@@ -4,8 +4,10 @@ from pathlib import Path
 
 from textual.app import ComposeResult
 from textual.containers import Horizontal
-from textual.widgets import Button, Checkbox, Label, Rule
+from textual.widgets import Button, Checkbox, Input, Label, Rule
 from textual import work
+
+_DEFAULT_SYSTEM_PROMPT = "You are a helpful assistant."
 
 from tui.app import BasePanel
 from tui.domain import infer_status, Status, status_order
@@ -22,6 +24,8 @@ _SYNTH_FIELDS = [
     ConfigField("Batch size", "workspaces/{domain}/config.yaml", ["generate", "batch_size"]),
     ConfigField("Topics", "workspaces/{domain}/config.yaml", ["generate", "num_topics"]),
     ConfigField("Judge cutoff", "workspaces/{domain}/config.yaml", ["filter", "judge", "score_cutoff"]),
+    ConfigField("System prompt", "workspaces/{domain}/config.yaml", ["prepare", "system_prompt"],
+                placeholder=_DEFAULT_SYSTEM_PROMPT, full_width=True),
 ]
 
 
@@ -81,8 +85,9 @@ class SyntheticPanel(BasePanel):
         elif bid == "prepare-btn":
             log.write_line(f"Preparing data splits for '{self.domain}'…")
             ws = Path("workspaces") / self.domain
+            system_prompt = self.query_one("#cfg-system-prompt", Input).value.strip() or _DEFAULT_SYSTEM_PROMPT
             self._run_cmd(["python3", "cli.py", "prepare", self.domain,
-                           "--system-prompt", "You are a helpful assistant.",
+                           "--system-prompt", system_prompt,
                            "--out-dir", str(ws / "processed")], finish_id=bid)
 
     @work(thread=True)

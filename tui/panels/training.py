@@ -173,7 +173,6 @@ class TrainingPanel(BasePanel):
             ws = Path("workspaces") / self.domain
             self._run_cmd(
                 ["python3", "cli.py", "prepare", self.domain,
-                 "--system-prompt", "You are a helpful assistant.",
                  "--out-dir", str(ws / "processed")],
                 finish_id="prepare-data-btn",
             )

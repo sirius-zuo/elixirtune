@@ -22,6 +22,8 @@ class ConfigField:
     yaml_file: str   # may contain {domain} placeholder
     key_path: list[str]
     password: bool = False
+    placeholder: str = ""
+    full_width: bool = False
 
 
 def _deep_merge(base: dict, override: dict) -> dict:
@@ -131,15 +133,27 @@ ConfigForm .config-cell Input { width: 1fr; }
                 )
                 yield Button("Delete", id="cfg-delete-preset", variant="error", disabled=True)
         yield SectionRule("Configuration")
+
+        def field_input(f: ConfigField) -> Input:
+            yaml_file = f.yaml_file.format(domain=self._domain)
+            path = Path(yaml_file)
+            data = yaml.safe_load(path.read_text()) if path.exists() else {}
+            current = str(_get_nested(data, f.key_path))
+            return Input(value=current, password=f.password,
+                         placeholder=f.placeholder, id=_input_id(f.label))
+
         with Grid(classes="config-grid"):
             for f in self._fields:
-                yaml_file = f.yaml_file.format(domain=self._domain)
-                path = Path(yaml_file)
-                data = yaml.safe_load(path.read_text()) if path.exists() else {}
-                current = str(_get_nested(data, f.key_path))
+                if f.full_width:
+                    continue
                 with Vertical(classes="config-cell"):
                     yield Label(f.label)
-                    yield Input(value=current, password=f.password, id=_input_id(f.label))
+                    yield field_input(f)
+        for f in self._fields:
+            if not f.full_width:
+                continue
+            yield Label(f.label)
+            yield field_input(f)
         yield SectionRule("Save config as:")
         with Horizontal(classes="preset-save-row"):
             yield Input(placeholder="preset name (required)…", id="preset-name")
