@@ -4,7 +4,7 @@ from pathlib import Path
 
 from textual.app import ComposeResult
 from textual.containers import Horizontal
-from textual.widgets import Button, Label, Rule
+from textual.widgets import Button, Checkbox, Label, Rule
 from textual import work
 
 from tui.app import BasePanel
@@ -27,6 +27,8 @@ class SyntheticPanel(BasePanel):
     DEFAULT_CSS = """
     SyntheticPanel { height: 100%; padding: 1 1 0 1; }
     SyntheticPanel #synth-config-form { height: auto; max-height: 50%; overflow-y: auto; }
+    SyntheticPanel #verbose-log > .toggle--button { color: $panel; }
+    SyntheticPanel #verbose-log.-on > .toggle--button { color: $text-success; }
     """
 
     def compose(self) -> ComposeResult:
@@ -37,6 +39,7 @@ class SyntheticPanel(BasePanel):
             yield Button("Curate", id="curate-btn", disabled=True, variant="success")
             yield Button("Generate", id="gen-btn", disabled=True, variant="success")
             yield Button("Prepare", id="prepare-btn", disabled=True, variant="success")
+        yield Checkbox("Verbose log (full request/response per item)", id="verbose-log")
         yield SectionRule("Log")
         yield LogView(id="synth-log")
         yield Rule()
@@ -69,7 +72,10 @@ class SyntheticPanel(BasePanel):
             self._run_cmd(["python3", "cli.py", "curate", self.domain], finish_id=bid)
         elif bid == "gen-btn":
             log.write_line(f"Generating synthetic data for '{self.domain}' — this may take a while…")
-            self._run_cmd(["python3", "cli.py", "generate", self.domain], finish_id=bid)
+            cmd = ["python3", "cli.py", "generate", self.domain]
+            if self.query_one("#verbose-log", Checkbox).value:
+                cmd.append("--verbose")
+            self._run_cmd(cmd, finish_id=bid)
         elif bid == "prepare-btn":
             log.write_line(f"Preparing data splits for '{self.domain}'…")
             ws = Path("workspaces") / self.domain

@@ -13,11 +13,15 @@ app = typer.Typer(context_settings={"allow_interspersed_args": True})
 from commands import _ws
 
 @app.callback(invoke_without_command=True)
-def generate(ctx: typer.Context, domain: str = typer.Argument(...)):
+def generate(
+    ctx: typer.Context,
+    domain: str = typer.Argument(...),
+    verbose: bool = typer.Option(False, "--verbose", help="Log each request/response and per-item judge score"),
+):
     """Generate and filter synthetic training data."""
     if ctx.invoked_subcommand is not None:
         return
     cfg = load_config(domain)
     teacher = from_config(cfg)
     embedder = SentenceTransformerEmbedder(cfg["filter"]["dedup"]["embedding_model"])
-    run_generate(domain, cfg, teacher, embedder)
+    run_generate(domain, cfg, teacher, embedder, verbose=verbose)

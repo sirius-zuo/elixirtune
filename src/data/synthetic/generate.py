@@ -24,7 +24,7 @@ def _parse_object(text: str) -> dict:
     except json.JSONDecodeError as e:
         raise GenerationMiss(str(e))
 
-def generate_one(seeds: list[dict], teacher: Teacher, fewshot_k: int, cot: bool) -> dict:
+def generate_one(seeds: list[dict], teacher: Teacher, fewshot_k: int, cot: bool, verbose: bool = False) -> dict:
     cot_instr = (
         'First reason step by step in "reasoning", then give the final answer. '
         if cot else "Leave \"reasoning\" empty. "
@@ -36,7 +36,14 @@ def generate_one(seeds: list[dict], teacher: Teacher, fewshot_k: int, cot: bool)
         f"{cot_instr}"
         'Return ONLY JSON: {"reasoning": "...", "user": "...", "assistant": "..."}'
     )
-    obj = _parse_object(teacher.chat([{"role": "user", "content": prompt}]))
+    if verbose:
+        print("─" * 60, flush=True)
+        print(f"--- request ---\n{prompt}", flush=True)
+    raw = teacher.chat([{"role": "user", "content": prompt}])
+    if verbose:
+        print(f"--- response ---\n{raw}", flush=True)
+        print("─" * 60, flush=True)
+    obj = _parse_object(raw)
     if "user" not in obj or "assistant" not in obj:
         raise GenerationMiss("missing user/assistant")
     return make_record(obj["user"], obj["assistant"], {"source": "fewshot", "cot": obj.get("reasoning", "")})

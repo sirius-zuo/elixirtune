@@ -45,7 +45,7 @@ def dedup(records, embedder: Embedder, threshold: float):
     return kept, rejected
 
 
-def judge(records, teacher: Teacher, score_cutoff: int):
+def judge(records, teacher: Teacher, score_cutoff: int, verbose: bool = False):
     kept, rejected = [], []
     for r in records:
         prompt = (
@@ -58,7 +58,11 @@ def judge(records, teacher: Teacher, score_cutoff: int):
             score = 0
         out = deepcopy(r)
         out["meta"]["judge_score"] = score
-        if score >= score_cutoff:
+        passed = score >= score_cutoff
+        if verbose:
+            preview = " ".join(r["conversation"][0]["content"].split())[:60]
+            print(f"  judge score={score} {'kept' if passed else 'rejected'} | {preview}", flush=True)
+        if passed:
             kept.append(out)
         else:
             out["meta"]["reject_reason"] = "below_judge_cutoff"
