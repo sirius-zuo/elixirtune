@@ -1,12 +1,13 @@
 # tui/panels/training.py
 import json
+import re
 import subprocess
 from pathlib import Path
 
 import yaml
 from textual.app import ComposeResult
 from textual.containers import Horizontal
-from textual.widgets import Button, Label, Rule
+from textual.widgets import Button, Label, Rule, Select
 from textual import work
 
 from tui.app import BasePanel
@@ -15,6 +16,12 @@ from tui.runner import RunnerOutput, RunnerDone, stream_subprocess
 from tui.widgets.config_form import ConfigField, ConfigForm
 from tui.widgets.log_view import LogView
 from tui.widgets.section_rule import SectionRule
+
+# mlx_tune trainers stream progress to stdout (no transformers callbacks):
+#   DPO: "Step 5/100 | Loss: 1.2345"   SFT (mlx_lm): "Iter 5: Train loss 1.234, ..."
+_DPO_STEP_RE = re.compile(r"Step (\d+)/\d+\s*\|\s*Loss:\s*([\d.]+)")
+_SFT_TRAIN_RE = re.compile(r"Iter (\d+):\s*Train loss\s*([\d.]+)")
+_SFT_VAL_RE = re.compile(r"Iter (\d+):\s*Val loss\s*([\d.]+)")
 
 _TRAIN_FIELDS = [
     ConfigField("Base model", "config/model_config.yaml", ["base_model", "path"]),
@@ -29,17 +36,20 @@ class TrainingPanel(BasePanel):
     TrainingPanel { height: 100%; padding: 1 1 0 1; }
     TrainingPanel #train-config-form { height: auto; max-height: 40%; overflow-y: auto; }
     TrainingPanel #train-summary { height: auto; }
+    TrainingPanel #method-select { width: 28; margin-bottom: 1; }
     """
 
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
-        self._poll_timer = None
+        self._metrics = None   # accumulates parsed loss while a run streams
 
     def compose(self) -> ComposeResult:
         yield ConfigForm(_TRAIN_FIELDS, id="train-config-form")
         yield SectionRule("Training History")
         yield Label("", id="train-summary")
         yield SectionRule("Run Training")
+        yield Select([("SFT", "sft"), ("DPO", "dpo")], value="sft",
+                     allow_blank=False, id="method-select")
         with Horizontal(classes="btn-row"):
             yield Button("Prepare data", id="prepare-data-btn", disabled=True, variant="success")
             yield Button("▶ Train", id="train-btn", disabled=True, variant="success")
@@ -56,10 +66,22 @@ class TrainingPanel(BasePanel):
         self.query_one("#prepare-data-btn", Button).disabled = (
             status_order(status) < status_order(Status.SEEDED)
         )
-        self.query_one("#train-btn", Button).disabled = (
-            status_order(status) < status_order(Status.PREPARED)
-        )
+        method = self._method()
+        if method == "dpo":
+            # DPO needs preference data (produced by the DPO data pipeline).
+            train_disabled = not (ws / "processed" / "dpo.json").exists()
+        else:
+            train_disabled = status_order(status) < status_order(Status.PREPARED)
+        self.query_one("#train-btn", Button).disabled = train_disabled
         self._load_training_summary(ws)
+
+    def _method(self) -> str:
+        value = self.query_one("#method-select", Select).value
+        return value if value is not Select.BLANK else "sft"
+
+    def on_select_changed(self, event: Select.Changed) -> None:
+        if event.select.id == "method-select":
+            self.refresh_content()
 
     def _load_training_summary(self, ws: Path) -> None:
         label = self.query_one("#train-summary", Label)
@@ -137,30 +159,33 @@ class TrainingPanel(BasePanel):
         label.update("  ·  ".join(parts) if parts else "")
 
     def watch_domain(self, domain: str | None) -> None:
-        if self._poll_timer is not None:
-            self._poll_timer.stop()
-            self._poll_timer = None
+        self._metrics = None
         super().watch_domain(domain)
 
-    def _poll_metrics(self) -> None:
-        if not self.domain:
+    def _capture_metric(self, line: str) -> None:
+        """Parse a streamed trainer line for loss/step and persist + display it."""
+        if self._metrics is None or not self.domain:
             return
-        ws = Path("workspaces") / self.domain
-        metrics_file = ws / "logs" / "training" / "training_metrics.json"
-        if not metrics_file.exists():
+        m_train = _DPO_STEP_RE.search(line) or _SFT_TRAIN_RE.search(line)
+        m_val = _SFT_VAL_RE.search(line)
+        changed = False
+        if m_train:
+            self._metrics["iterations"].append(int(m_train.group(1)))
+            self._metrics["train_loss"].append(float(m_train.group(2)))
+            changed = True
+        if m_val:
+            self._metrics["val_loss"].append(float(m_val.group(2)))
+            changed = True
+        if not changed:
             return
-        try:
-            metrics = json.loads(metrics_file.read_text())
-        except (json.JSONDecodeError, OSError):
-            return
-        train_loss = metrics.get("train_loss", [])
-        val_loss = metrics.get("val_loss", [])
-        iters = metrics.get("iterations", [])
-        if iters and train_loss:
-            tl = f"{train_loss[-1]:.3f}"
-            vl = f"{val_loss[-1]:.3f}" if val_loss else "—"
+        mp = Path("workspaces") / self.domain / "logs" / "training" / "training_metrics.json"
+        mp.parent.mkdir(parents=True, exist_ok=True)
+        mp.write_text(json.dumps(self._metrics))
+        its, tl, vl = self._metrics["iterations"], self._metrics["train_loss"], self._metrics["val_loss"]
+        if its and tl:
+            vl_s = f"{vl[-1]:.3f}" if vl else "—"
             self.query_one("#train-progress", Label).update(
-                f"Iter {iters[-1]}   train: {tl}   val: {vl}"
+                f"Iter {its[-1]}   train: {tl[-1]:.3f}   val: {vl_s}"
             )
 
     def on_config_form_saved(self, _: ConfigForm.Saved) -> None:
@@ -181,8 +206,9 @@ class TrainingPanel(BasePanel):
             event.button.disabled = True
             ws = Path("workspaces") / self.domain
             generate_runtime_configs(ws)
-            self._run_train(self.domain)
-            self._poll_timer = self.set_interval(2.0, self._poll_metrics)
+            self._metrics = {"train_loss": [], "val_loss": [], "iterations": []}
+            self.query_one("#train-progress", Label).update("")
+            self._run_train(self.domain, self._method())
 
     @work(thread=True)
     def _run_cmd(self, cmd: list[str], finish_id: str) -> None:
@@ -193,14 +219,21 @@ class TrainingPanel(BasePanel):
                 self.post_message(RunnerDone(code, tag=finish_id))
 
     @work(thread=True)
-    def _run_train(self, domain: str) -> None:
+    def _run_train(self, domain: str, method: str = "sft") -> None:
         ws = Path("workspaces") / domain
+        if method == "dpo":
+            train_data = ws / "processed" / "dpo.json"
+            val_args = []   # DPO preference data isn't split into a val set here
+        else:
+            train_data = ws / "processed" / "train.json"
+            val_args = ["--val-data", str(ws / "processed" / "val.json")]
         cmd = [
             "python3", "cli.py", "train", domain,
+            "--method", method,
             "--model-config", str(ws / "runtime_model_config.yaml"),
             "--training-config", str(ws / "runtime_training_config.yaml"),
-            "--train-data", str(ws / "processed" / "train.json"),
-            "--val-data", str(ws / "processed" / "val.json"),
+            "--train-data", str(train_data),
+            *val_args,
         ]
         proc = subprocess.Popen(
             cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
@@ -212,6 +245,7 @@ class TrainingPanel(BasePanel):
 
     def on_runner_output(self, event: RunnerOutput) -> None:
         self.query_one(LogView).write_line(event.line)
+        self._capture_metric(event.line)
 
     def on_runner_done(self, event: RunnerDone) -> None:
         if event.tag == "prepare-data-btn":
@@ -224,10 +258,7 @@ class TrainingPanel(BasePanel):
             self.refresh_content()
             self.call_later(self.app._rescan)
             return
-        if self._poll_timer is not None:
-            self._poll_timer.stop()
-            self._poll_timer = None
-        self._poll_metrics()
+        self._metrics = None
         self.query_one("#train-btn", Button).disabled = False
         if event.exit_code != 0:
             self.query_one(LogView).write_line(

@@ -302,37 +302,61 @@ async def test_hf_upload_button_click_opens_modal(tmp_path):
 
 # ── Training live progress tests ─────────────────────────────────────────────
 
-async def test_train_progress_label_updates_from_metrics(tmp_path):
-    ws = tmp_path / "workspaces" / "d"
-    (ws / "processed").mkdir(parents=True)
-    (ws / "processed" / "train.json").write_text("[]")
-    (ws / "logs" / "training").mkdir(parents=True)
-    metrics = {"train_loss": [2.0, 1.5], "val_loss": [2.1, 1.6], "iterations": [100, 200]}
-    (ws / "logs" / "training" / "training_metrics.json").write_text(
-        json.dumps(metrics)
-    )
-    import os; os.chdir(tmp_path)
-    async with TrainApp(ws).run_test() as pilot:
-        await pilot.pause()
-        panel = pilot.app.query_one(TrainingPanel)
-        panel._poll_metrics()
-        await pilot.pause()
-        label = pilot.app.query_one("#train-progress", Label)
-        assert "200" in str(label.content)
-        assert "1.500" in str(label.content)
-
-
-async def test_train_progress_no_op_without_metrics_file(tmp_path):
+async def test_train_progress_captures_streamed_loss(tmp_path):
+    """Loss is parsed from streamed trainer stdout (DPO + SFT formats), persisted, and shown."""
     ws = tmp_path / "workspaces" / "d"
     ws.mkdir(parents=True)
     import os; os.chdir(tmp_path)
     async with TrainApp(ws).run_test() as pilot:
         await pilot.pause()
         panel = pilot.app.query_one(TrainingPanel)
-        panel._poll_metrics()   # must not raise
+        panel._metrics = {"train_loss": [], "val_loss": [], "iterations": []}
+        panel._capture_metric("  Step 5/100 | Loss: 1.2345 | batch_size: 4")   # DPO
+        panel._capture_metric("Iter 10: Train loss 2.345, Learning Rate 1e-5")  # SFT
+        panel._capture_metric("Iter 10: Val loss 2.400, Val took 1.2s")         # SFT val
         await pilot.pause()
+        data = json.loads((ws / "logs" / "training" / "training_metrics.json").read_text())
+        assert data["iterations"] == [5, 10]
+        assert data["train_loss"] == [1.2345, 2.345]
+        assert data["val_loss"] == [2.4]
         label = pilot.app.query_one("#train-progress", Label)
-        assert str(label.content) == ""
+        assert "Iter 10" in str(label.content)
+        assert "2.345" in str(label.content)
+
+
+async def test_dpo_method_train_button_requires_dpo_data(tmp_path):
+    ws = tmp_path / "workspaces" / "d"
+    (ws / "processed").mkdir(parents=True)
+    (ws / "processed" / "train.json").write_text("[]")   # SFT data present
+    import os; os.chdir(tmp_path)
+    async with TrainApp(ws).run_test() as pilot:
+        await pilot.pause()
+        from textual.widgets import Select
+        sel = pilot.app.query_one("#method-select", Select)
+        assert not pilot.app.query_one("#train-btn", Button).disabled   # SFT ready
+        sel.value = "dpo"
+        await pilot.pause()
+        assert pilot.app.query_one("#train-btn", Button).disabled       # DPO needs dpo.json
+        (ws / "processed" / "dpo.json").write_text(
+            json.dumps([{"prompt": "p", "chosen": "c", "rejected": "r"}])
+        )
+        pilot.app.query_one(TrainingPanel).refresh_content()
+        await pilot.pause()
+        assert not pilot.app.query_one("#train-btn", Button).disabled   # DPO ready
+
+
+async def test_train_progress_capture_no_op_when_not_training(tmp_path):
+    ws = tmp_path / "workspaces" / "d"
+    ws.mkdir(parents=True)
+    import os; os.chdir(tmp_path)
+    async with TrainApp(ws).run_test() as pilot:
+        await pilot.pause()
+        panel = pilot.app.query_one(TrainingPanel)
+        # _metrics is None outside a run → capturing a line must be a harmless no-op
+        panel._capture_metric("Iter 10: Train loss 2.345")
+        await pilot.pause()
+        assert str(pilot.app.query_one("#train-progress", Label).content) == ""
+        assert not (ws / "logs" / "training" / "training_metrics.json").exists()
 
 
 # ── GGUF export tests ───────────────────────────────────────────────────────
