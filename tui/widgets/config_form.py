@@ -6,7 +6,7 @@ from typing import Any
 
 import yaml
 from textual.app import ComposeResult
-from textual.containers import Horizontal, Vertical
+from textual.containers import Grid, Horizontal, Vertical
 from textual.message import Message
 from textual.widget import Widget
 from textual.widgets import Button, Input, Label, Select
@@ -100,6 +100,15 @@ ConfigForm .preset-select-row #cfg-delete-preset { width: auto; }
 ConfigForm .preset-save-row { height: auto; margin-top: 1; }
 ConfigForm .preset-save-row #preset-name { width: 1fr; }
 ConfigForm .preset-save-row #cfg-save-preset { width: auto; }
+ConfigForm .config-grid {
+    grid-size: 2;
+    grid-columns: 1fr 1fr;
+    grid-gutter: 0 2;
+    grid-rows: auto;
+    height: auto;
+}
+ConfigForm .config-cell { height: auto; }
+ConfigForm .config-cell Input { width: 1fr; }
 """
 
     class Saved(Message):
@@ -122,13 +131,15 @@ ConfigForm .preset-save-row #cfg-save-preset { width: auto; }
                 )
                 yield Button("Delete", id="cfg-delete-preset", variant="error", disabled=True)
         yield SectionRule("Configuration")
-        for f in self._fields:
-            yield Label(f.label)
-            yaml_file = f.yaml_file.format(domain=self._domain)
-            path = Path(yaml_file)
-            data = yaml.safe_load(path.read_text()) if path.exists() else {}
-            current = str(_get_nested(data, f.key_path))
-            yield Input(value=current, password=f.password, id=_input_id(f.label))
+        with Grid(classes="config-grid"):
+            for f in self._fields:
+                yaml_file = f.yaml_file.format(domain=self._domain)
+                path = Path(yaml_file)
+                data = yaml.safe_load(path.read_text()) if path.exists() else {}
+                current = str(_get_nested(data, f.key_path))
+                with Vertical(classes="config-cell"):
+                    yield Label(f.label)
+                    yield Input(value=current, password=f.password, id=_input_id(f.label))
         yield SectionRule("Save config as:")
         with Horizontal(classes="preset-save-row"):
             yield Input(placeholder="preset name (required)…", id="preset-name")
