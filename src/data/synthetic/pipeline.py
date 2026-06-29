@@ -11,6 +11,11 @@ from .refine import apply_passes
 class CurationGateError(Exception):
     pass
 
+
+class GenerationEmptyError(Exception):
+    """Raised when a generate run produces zero usable examples after filtering."""
+    pass
+
 def _categorize(record: dict) -> dict:
     # Lightweight default category until a richer classifier exists.
     record["meta"].setdefault("category", "bug")
@@ -92,8 +97,12 @@ def run_generate(domain, cfg, teacher, embedder, root=Path("."), now=None, verbo
     kept, rej = enforce_diversity(kept, cfg["filter"]["diversity"]["quotas"], target); rejected += rej
     log(f"  diversity: {len(kept)} kept, {len(rej)} rejected")
 
-    assemble(kept, ws / "generated" / "filtered.jsonl")
-    log(f"Done: {len(kept)} examples → generated/filtered.jsonl")
+    if kept:
+        assemble(kept, ws / "generated" / "filtered.jsonl")
+        log(f"Done: {len(kept)} examples → generated/filtered.jsonl")
+    else:
+        log("No examples survived filtering — nothing written to filtered.jsonl. "
+            "Check generation quality or relax the dedup/judge thresholds.")
 
     ts = now or datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M")
     run_dir = ws / "runs" / ts
@@ -102,4 +111,6 @@ def run_generate(domain, cfg, teacher, embedder, root=Path("."), now=None, verbo
     judge_scores = [r["meta"]["judge_score"] for r in kept if "judge_score" in r["meta"]]
     write_manifest(run_dir, build_manifest(cfg, seeds,
                    {"generated": len(raw), "filtered": len(kept)}, judge_scores))
+    if not kept:
+        raise GenerationEmptyError("generation produced 0 usable examples")
     return run_dir

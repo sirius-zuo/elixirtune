@@ -6,7 +6,7 @@ import typer
 from data.synthetic.config import load_config
 from data.synthetic.teacher import from_config
 from data.synthetic.embedder import SentenceTransformerEmbedder
-from data.synthetic.pipeline import run_generate
+from data.synthetic.pipeline import run_generate, GenerationEmptyError
 
 app = typer.Typer(context_settings={"allow_interspersed_args": True})
 
@@ -24,4 +24,7 @@ def generate(
     cfg = load_config(domain)
     teacher = from_config(cfg)
     embedder = SentenceTransformerEmbedder(cfg["filter"]["dedup"]["embedding_model"])
-    run_generate(domain, cfg, teacher, embedder, verbose=verbose)
+    try:
+        run_generate(domain, cfg, teacher, embedder, verbose=verbose)
+    except GenerationEmptyError:
+        raise typer.Exit(1)
