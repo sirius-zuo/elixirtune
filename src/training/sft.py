@@ -60,7 +60,7 @@ def run(
         dataset_text_field="text",
     )
     if eval_ds is not None:
-        sft_args["eval_steps"] = int(t_cfg["training"]["steps_per_eval"])
+        sft_args["steps_per_eval"] = int(t_cfg["training"]["steps_per_eval"])
 
     trainer = SFTTrainer(
         model=model,

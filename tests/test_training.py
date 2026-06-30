@@ -70,8 +70,12 @@ def test_grpo_raises_without_correct_data(tmp_path):
             tmp_path / "train.json", None)
 
 
-def test_sft_does_not_pass_eval_steps_without_eval_dataset(tmp_path):
-    """SFTConfig must not include eval_steps when val_data_path is None."""
+def test_sft_configures_eval_only_with_val_data(tmp_path):
+    """SFT sets steps_per_eval + eval_dataset only when val data is given.
+
+    Uses the REAL SFTConfig (not a stub) so it exercises the actual mlx_tune
+    API — this is what catches passing a non-existent param like 'eval_steps'.
+    """
     pytest.importorskip("mlx_tune")  # training backend; skip when not installed
     import sys
     sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -83,25 +87,25 @@ def test_sft_does_not_pass_eval_steps_without_eval_dataset(tmp_path):
     train_cfg.write_text(
         "training:\n  batch_size: 2\n  learning_rate: 1e-5\n  iters: 10\n  steps_per_eval: 5\n"
     )
-    train_data = tmp_path / "train.json"
-    train_data.write_text('[{"text": "hello"}]')
+    train_data = tmp_path / "train.json"; train_data.write_text('[{"text": "hi"}]')
+    val_data = tmp_path / "val.json"; val_data.write_text('[{"text": "bye"}]')
 
-    captured_kwargs = {}
+    def call(val_path):
+        with patch("mlx_tune.FastLanguageModel") as flm, \
+             patch("mlx_tune.SFTTrainer") as trainer, \
+             patch("src.training.sft.Dataset") as ds:
+            flm.from_pretrained.return_value = (MagicMock(), MagicMock())
+            flm.get_peft_model.return_value = MagicMock()
+            ds.from_list.return_value = MagicMock()
+            from src.training.sft import run
+            run("d", model_cfg, train_cfg, train_data, val_path)
+        return trainer.call_args
 
-    def fake_sft_config(**kwargs):
-        captured_kwargs.update(kwargs)
-        return MagicMock()
+    # With val data: the real SFTConfig carries the configured eval cadence.
+    _, kw = call(val_data)
+    assert kw["args"].steps_per_eval == 5
+    assert kw["eval_dataset"] is not None
 
-    with patch("mlx_tune.FastLanguageModel") as mock_flm, \
-         patch("mlx_tune.SFTTrainer") as mock_trainer, \
-         patch("mlx_tune.SFTConfig", side_effect=fake_sft_config), \
-         patch("src.training.sft.Dataset") as mock_dataset:
-        mock_flm.from_pretrained.return_value = (MagicMock(), MagicMock())
-        mock_flm.get_peft_model.return_value = MagicMock()
-        mock_trainer.return_value.train.return_value = None
-        mock_dataset.from_list.return_value = MagicMock()
-        from src.training.sft import run
-        run("d", model_cfg, train_cfg, train_data, None)
-
-    assert "eval_steps" not in captured_kwargs, \
-        f"eval_steps should not be passed when val_data is None, got {captured_kwargs}"
+    # Without val data: no eval dataset is wired up.
+    _, kw_no_val = call(None)
+    assert kw_no_val["eval_dataset"] is None
