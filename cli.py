@@ -31,9 +31,9 @@ app.add_typer(chat_app,     name="chat")
 
 @app.command()
 def tui(domain: str = typer.Option(None, help="Domain to pre-select on launch")):
-    """Launch the ElixirLoRA TUI."""
-    from tui.app import ElixirLoRAApp
-    ElixirLoRAApp(initial_domain=domain).run()
+    """Launch the ElixirTune TUI."""
+    from tui.app import ElixirTuneApp
+    ElixirTuneApp(initial_domain=domain).run()
 
 
 if __name__ == "__main__":
