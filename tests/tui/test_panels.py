@@ -302,6 +302,22 @@ async def test_hf_upload_button_click_opens_modal(tmp_path):
 
 # ── Training live progress tests ─────────────────────────────────────────────
 
+async def test_prepare_dpo_button_gated_by_method_and_seeds(tmp_path):
+    ws = tmp_path / "workspaces" / "d"
+    (ws / "seeds").mkdir(parents=True)
+    (ws / "seeds" / "approved.jsonl").write_text('{"conversation":[]}\n')   # seeded
+    import os; os.chdir(tmp_path)
+    async with TrainApp(ws).run_test() as pilot:
+        await pilot.pause()
+        from textual.widgets import Select
+        # SFT method → DPO data prep not applicable
+        assert pilot.app.query_one("#prepare-dpo-btn", Button).disabled
+        pilot.app.query_one("#method-select", Select).value = "dpo"
+        await pilot.pause()
+        # DPO + seeds present → enabled
+        assert not pilot.app.query_one("#prepare-dpo-btn", Button).disabled
+
+
 async def test_train_progress_captures_streamed_loss(tmp_path):
     """Loss is parsed from streamed trainer stdout (DPO + SFT formats), persisted, and shown."""
     ws = tmp_path / "workspaces" / "d"

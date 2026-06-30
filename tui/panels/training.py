@@ -52,6 +52,7 @@ class TrainingPanel(BasePanel):
                      allow_blank=False, id="method-select")
         with Horizontal(classes="btn-row"):
             yield Button("Prepare data", id="prepare-data-btn", disabled=True, variant="success")
+            yield Button("Prepare DPO data", id="prepare-dpo-btn", disabled=True, variant="success")
             yield Button("▶ Train", id="train-btn", disabled=True, variant="success")
         yield SectionRule("Log")
         yield Label("", id="train-progress")
@@ -67,12 +68,15 @@ class TrainingPanel(BasePanel):
             status_order(status) < status_order(Status.SEEDED)
         )
         method = self._method()
+        seeded = status_order(status) >= status_order(Status.SEEDED)
         if method == "dpo":
             # DPO needs preference data (produced by the DPO data pipeline).
             train_disabled = not (ws / "processed" / "dpo.json").exists()
         else:
             train_disabled = status_order(status) < status_order(Status.PREPARED)
         self.query_one("#train-btn", Button).disabled = train_disabled
+        # DPO data prep is relevant only for DPO, and needs prompts (seeds/generated).
+        self.query_one("#prepare-dpo-btn", Button).disabled = not (method == "dpo" and seeded)
         self._load_training_summary(ws)
 
     def _method(self) -> str:
@@ -201,6 +205,16 @@ class TrainingPanel(BasePanel):
                  "--out-dir", str(ws / "processed")],
                 finish_id="prepare-data-btn",
             )
+        elif event.button.id == "prepare-dpo-btn" and self.domain:
+            event.stop()
+            event.button.disabled = True
+            ws = Path("workspaces") / self.domain
+            generate_runtime_configs(ws)
+            self._run_cmd(
+                ["python3", "cli.py", "prepare-dpo", self.domain,
+                 "--model-config", str(ws / "runtime_model_config.yaml")],
+                finish_id="prepare-dpo-btn",
+            )
         elif event.button.id == "train-btn" and self.domain:
             event.stop()
             event.button.disabled = True
@@ -248,13 +262,14 @@ class TrainingPanel(BasePanel):
         self._capture_metric(event.line)
 
     def on_runner_done(self, event: RunnerDone) -> None:
-        if event.tag == "prepare-data-btn":
+        if event.tag in ("prepare-data-btn", "prepare-dpo-btn"):
+            what = "DPO data" if event.tag == "prepare-dpo-btn" else "Data"
             if event.exit_code != 0:
                 self.query_one(LogView).write_line(
-                    f"[red]Prepare failed (exit {event.exit_code})[/red]"
+                    f"[red]{what} prep failed (exit {event.exit_code})[/red]"
                 )
             else:
-                self.query_one(LogView).write_line("[green]Data prepared.[/green]")
+                self.query_one(LogView).write_line(f"[green]{what} prepared.[/green]")
             self.refresh_content()
             self.call_later(self.app._rescan)
             return

@@ -21,3 +21,10 @@ filter:
   dedup: {embedding_model: all-MiniLM-L6-v2, similarity_threshold: 0.92}
   judge: {model: qwen3.6, score_cutoff: 4}
   diversity: {quotas: {bug: 1.0}}
+dpo_data:
+  teacher_samples: 2   # teacher candidate answers per prompt (0 to disable)
+  use_sft: true        # include the SFT-fused model as a candidate source
+  use_base: true       # include the base model as a candidate source
+  min_margin: 2        # min judge-score gap (1-5) to keep a chosen/rejected pair
+  max_prompts: 200     # cap on prompts to build preferences for
+  max_tokens: 256      # max tokens per generated candidate
