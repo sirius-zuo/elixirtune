@@ -1,6 +1,6 @@
-# ElixirLoRA
+# ElixirTune
 
-Fine-tuning an LLM involves many moving parts — data preparation, training runs, evaluation, adapter fusion, and deployment. ElixirLoRA is a LoRA fine-tuning workbench for Apple Silicon that organizes the full pipeline into a single managed workspace per domain, driven by a guided TUI or CLI.
+Fine-tuning a model involves many moving parts — data preparation, training runs, evaluation, adapter fusion, and deployment. ElixirTune is a fine-tuning workbench for Apple Silicon that organizes the full pipeline into a single managed workspace per domain, driven by a guided TUI or CLI.
 
 Each domain gets its own workspace under `workspaces/<domain>/`, tracking everything from raw seed examples through trained adapters to a deployable GGUF — so the state of any fine-tuning project is always visible and reproducible. Synthetic training data generation from a local teacher LLM is available as an optional step when you don't have enough hand-curated examples.
 
