@@ -50,17 +50,32 @@ def test_dpo_trains_on_valid_preference_data(tmp_path):
 
     # Mock model load + trainer (no real training), but use the REAL DPOConfig so
     # the test actually exercises the mlx_tune API surface dpo.py depends on.
-    with patch("mlx_tune.FastLanguageModel") as flm, \
-         patch("mlx_tune.DPOTrainer") as trainer:
-        flm.from_pretrained.return_value = (MagicMock(), MagicMock())
-        flm.get_peft_model.return_value = MagicMock()
-        from src.training.dpo import run
-        run("d", model_cfg, train_cfg, train_data, None)
+    def call():
+        with patch("mlx_tune.FastLanguageModel") as flm, \
+             patch("mlx_tune.DPOTrainer") as trainer:
+            flm.from_pretrained.return_value = (MagicMock(), MagicMock())
+            flm.get_peft_model.return_value = MagicMock()
+            from src.training.dpo import run
+            run("d", model_cfg, train_cfg, train_data, None)
+        return flm, trainer
 
+    import os
+    os.chdir(tmp_path)
+    flm, trainer = call()
     _, kwargs = trainer.call_args
     assert kwargs["args"].beta == 0.2            # configured beta on a real DPOConfig
     assert "eval_dataset" not in kwargs          # DPOTrainer has no eval dataset
     trainer.return_value.train.assert_called_once()
+    # No fused model present → falls back to the base model path.
+    assert flm.from_pretrained.call_args[0][0] == "m"
+
+    # With an SFT-fused model present, DPO continues from it by default
+    # (dpo.py uses the workspace-relative path).
+    fused = tmp_path / "workspaces" / "d" / "fused"
+    fused.mkdir(parents=True)
+    (fused / "model.safetensors").write_text("x")
+    flm2, _ = call()
+    assert flm2.from_pretrained.call_args[0][0] == str(Path("workspaces") / "d" / "fused")
 
 
 def test_grpo_raises_without_correct_data(tmp_path):

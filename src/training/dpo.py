@@ -37,10 +37,27 @@ def run(
 
     output_dir = str(Path("workspaces") / domain / "adapters")
 
-    # DPO trains a fresh LoRA on the base model; DPOTrainer builds the frozen
-    # reference model internally (ref_model=None).
+    # By default DPO continues from the SFT-fine-tuned model: mlx_tune can't load
+    # an existing adapter into a fresh DPO LoRA, so we start from the SFT-FUSED
+    # weights (the standard SFT→DPO pipeline). Set dpo.from_base to train a fresh
+    # LoRA on the original base model instead.
+    from_base = bool(dpo_cfg.get("from_base", False))
+    fused_dir = Path("workspaces") / domain / "fused"
+    if not from_base and fused_dir.exists() and any(fused_dir.iterdir()):
+        base_path = str(fused_dir)
+        print(f"DPO continuing from the SFT-fused model: {fused_dir}")
+    else:
+        base_path = m_cfg["base_model"]["path"]
+        if not from_base:
+            print(
+                "No SFT-fused model found — DPO will train from the base model. "
+                "Run SFT then Fuse first to continue from the fine-tuned model "
+                "(or set dpo.from_base: true to silence this)."
+            )
+
+    # DPOTrainer builds the frozen reference model internally (ref_model=None).
     model, tokenizer = FastLanguageModel.from_pretrained(
-        m_cfg["base_model"]["path"],
+        base_path,
         max_seq_length=m_cfg.get("max_seq_length", 2048),
     )
     model = FastLanguageModel.get_peft_model(

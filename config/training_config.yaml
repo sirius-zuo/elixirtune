@@ -11,4 +11,5 @@ training:
   learning_rate: 1.0e-05
   steps_per_eval: 50
 dpo:
-  beta: 0.1   # DPO preference strength (only used when method=dpo)
+  beta: 0.1        # DPO preference strength (only used when method=dpo)
+  from_base: false # false = continue from the SFT-fused model; true = fresh LoRA on base
