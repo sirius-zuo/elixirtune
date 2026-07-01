@@ -282,3 +282,31 @@ def test_ws_returns_correct_path():
     from commands import _ws
     assert _ws("d") == Path("workspaces/d")
     assert str(_ws("math")).endswith("workspaces/math")
+
+
+def test_init_writes_lm_type_by_default(tmp_path, monkeypatch):
+    import sys
+    import yaml
+    sys.path.insert(0, str(Path(__file__).parent.parent))
+    monkeypatch.chdir(tmp_path)
+    from typer.testing import CliRunner
+    from commands.init import app
+    runner = CliRunner()
+    result = runner.invoke(app, ["mydom"])
+    assert result.exit_code == 0
+    cfg = yaml.safe_load((tmp_path / "workspaces" / "mydom" / "config.yaml").read_text())
+    assert cfg["type"] == "lm"
+
+
+def test_init_writes_embedding_type(tmp_path, monkeypatch):
+    import sys
+    import yaml
+    sys.path.insert(0, str(Path(__file__).parent.parent))
+    monkeypatch.chdir(tmp_path)
+    from typer.testing import CliRunner
+    from commands.init import app
+    runner = CliRunner()
+    result = runner.invoke(app, ["mydom", "--type", "embedding"])
+    assert result.exit_code == 0
+    cfg = yaml.safe_load((tmp_path / "workspaces" / "mydom" / "config.yaml").read_text())
+    assert cfg["type"] == "embedding"

@@ -12,7 +12,7 @@ app = typer.Typer(context_settings={"allow_interspersed_args": True})
 def train(
     ctx: typer.Context,
     domain: str = typer.Argument(...),
-    method: str = typer.Option("sft", help="Training method: sft | dpo | grpo"),
+    method: str = typer.Option("sft", help="Training method: sft | dpo | grpo | embedding | cross-encoder"),
     model_config: Path = typer.Option(..., help="Path to runtime model config YAML"),
     training_config: Path = typer.Option(..., help="Path to runtime training config YAML"),
     train_data: Path = typer.Option(..., help="Path to train.json"),
@@ -27,6 +27,12 @@ def train(
         from src.training.dpo import run
     elif method == "grpo":
         from src.training.grpo import run
+    elif method == "embedding":
+        from src.training.embedding import run
+    elif method == "cross-encoder":
+        from src.training.cross_encoder import run
     else:
-        raise typer.BadParameter(f"Unknown method '{method}'. Choose: sft, dpo, grpo")
+        raise typer.BadParameter(
+            f"Unknown method '{method}'. Choose: sft, dpo, grpo, embedding, cross-encoder"
+        )
     run(domain, model_config, training_config, train_data, val_data)

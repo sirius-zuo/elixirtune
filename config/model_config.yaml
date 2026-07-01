@@ -11,3 +11,20 @@ lora:
   num_layers: 28
   rank: 16
   scale: 20.0
+embedding:
+  base_model: mlx-community/all-MiniLM-L6-v2
+  max_seq_length: 256
+  pooling_strategy: mean
+  lora:
+    rank: 16
+    alpha: 16
+    dropout: 0.0
+  output_dir: adapters
+cross_encoder:
+  base_model: cross-encoder/ms-marco-MiniLM-L-6-v2
+  max_seq_length: 512
+  lora:
+    rank: 8
+    alpha: 8
+    dropout: 0.0
+  output_dir: ce_adapters

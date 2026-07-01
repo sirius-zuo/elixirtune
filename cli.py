@@ -14,6 +14,7 @@ from commands.evaluate import app as evaluate_app
 from commands.fuse     import app as fuse_app
 from commands.export_gguf import app as export_gguf_app
 from commands.chat     import app as chat_app
+from commands.prepare_embedding import app as prepare_embedding_app
 
 app = typer.Typer(pretty_exceptions_enable=False)
 app.add_typer(init_app,     name="init")
@@ -27,6 +28,7 @@ app.add_typer(evaluate_app, name="evaluate")
 app.add_typer(fuse_app,     name="fuse")
 app.add_typer(export_gguf_app, name="export-gguf")
 app.add_typer(chat_app,     name="chat")
+app.add_typer(prepare_embedding_app, name="prepare-embedding")
 
 
 @app.command()

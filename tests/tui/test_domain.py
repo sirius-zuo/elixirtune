@@ -52,6 +52,84 @@ def test_scan_domains_returns_sorted(tmp_path):
 def test_scan_domains_empty_root(tmp_path):
     assert scan_domains(tmp_path) == []
 
+def test_read_domain_type_defaults_to_lm(tmp_path):
+    ws = tmp_path / "workspaces" / "d"
+    ws.mkdir(parents=True)
+    from tui.domain import read_domain_type
+    assert read_domain_type(ws) == "lm"
+
+
+def test_read_domain_type_reads_config(tmp_path):
+    ws = tmp_path / "workspaces" / "d"
+    ws.mkdir(parents=True)
+    (ws / "config.yaml").write_text(yaml.safe_dump({"type": "embedding"}))
+    from tui.domain import read_domain_type
+    assert read_domain_type(ws) == "embedding"
+
+
+def test_infer_status_embedding_empty(tmp_path):
+    ws = tmp_path / "workspaces" / "d"
+    ws.mkdir(parents=True)
+    (ws / "config.yaml").write_text(yaml.safe_dump({"type": "embedding"}))
+    from tui.domain import infer_status, Status
+    assert infer_status(ws) == Status.EMPTY
+
+
+def test_infer_status_embedding_data_ready_seeds(tmp_path):
+    ws = tmp_path / "workspaces" / "d"
+    (ws / "seeds").mkdir(parents=True)
+    (ws / "seeds" / "approved.jsonl").write_text("{}\n")
+    (ws / "config.yaml").write_text(yaml.safe_dump({"type": "embedding"}))
+    from tui.domain import infer_status, Status
+    assert infer_status(ws) == Status.DATA_READY
+
+
+def test_infer_status_embedding_data_ready_raw(tmp_path):
+    ws = tmp_path / "workspaces" / "d"
+    (ws / "data" / "raw").mkdir(parents=True)
+    (ws / "data" / "raw" / "pairs.json").write_text("[]")
+    (ws / "config.yaml").write_text(yaml.safe_dump({"type": "embedding"}))
+    from tui.domain import infer_status, Status
+    assert infer_status(ws) == Status.DATA_READY
+
+
+def test_infer_status_embedding_prepared(tmp_path):
+    ws = tmp_path / "workspaces" / "d"
+    (ws / "processed").mkdir(parents=True)
+    (ws / "processed" / "embedding_train.json").write_text("[]")
+    (ws / "processed" / "embedding_val.json").write_text("[]")
+    (ws / "config.yaml").write_text(yaml.safe_dump({"type": "embedding"}))
+    from tui.domain import infer_status, Status
+    assert infer_status(ws) == Status.PREPARED
+
+
+def test_infer_status_embedding_trained(tmp_path):
+    ws = tmp_path / "workspaces" / "d"
+    (ws / "adapters").mkdir(parents=True)
+    (ws / "adapters" / "adapter.npz").write_text("x")
+    (ws / "config.yaml").write_text(yaml.safe_dump({"type": "embedding"}))
+    from tui.domain import infer_status, Status
+    assert infer_status(ws) == Status.TRAINED
+
+
+def test_infer_status_embedding_ce_trained(tmp_path):
+    ws = tmp_path / "workspaces" / "d"
+    (ws / "adapters").mkdir(parents=True)
+    (ws / "adapters" / "adapter.npz").write_text("x")
+    (ws / "ce_adapters").mkdir(parents=True)
+    (ws / "ce_adapters" / "pytorch_model.bin").write_text("x")
+    (ws / "config.yaml").write_text(yaml.safe_dump({"type": "embedding"}))
+    from tui.domain import infer_status, Status
+    assert infer_status(ws) == Status.CE_TRAINED
+
+
+def test_existing_lm_status_unaffected(tmp_path):
+    ws = tmp_path / "workspaces" / "d"
+    (ws / "processed").mkdir(parents=True)
+    (ws / "processed" / "train.json").write_text("[]")
+    assert infer_status(ws) == Status.PREPARED
+
+
 def test_generate_runtime_configs_writes_overlays(tmp_path):
     ws = tmp_path / "workspaces" / "d"
     (tmp_path / "config").mkdir()

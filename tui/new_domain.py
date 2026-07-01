@@ -55,6 +55,12 @@ class NewDomainScreen(ModalScreen):
             yield Label("New Domain", id="dialog-title")
             yield Label("Domain name (lowercase, no spaces):")
             yield Input(id="new-domain-name", placeholder="e.g. my_assistant")
+            yield Label("Domain type:")
+            yield RadioSet(
+                RadioButton("Language Model", id="rb-type-lm", value=True),
+                RadioButton("Embedding Model", id="rb-type-embedding"),
+                id="type-radio",
+            )
             yield RadioSet(
                 RadioButton("Bootstrap from description", id="rb-bootstrap", value=True),
                 RadioButton("Import from file", id="rb-import"),
@@ -70,11 +76,18 @@ class NewDomainScreen(ModalScreen):
                 yield Button("Cancel", id="new-domain-cancel")
 
     def on_radio_set_changed(self, event: RadioSet.Changed) -> None:
-        is_import = event.pressed.id == "rb-import"
-        self.query_one("#label-desc").set_class(is_import, "hidden")
-        self.query_one("#new-domain-desc").set_class(is_import, "hidden")
-        self.query_one("#label-seeds").set_class(not is_import, "hidden")
-        self.query_one("#new-domain-seeds-path").set_class(not is_import, "hidden")
+        if event.radio_set.id == "source-radio":
+            is_import = event.pressed.id == "rb-import"
+            self.query_one("#label-desc").set_class(is_import, "hidden")
+            self.query_one("#new-domain-desc").set_class(is_import, "hidden")
+            self.query_one("#label-seeds").set_class(not is_import, "hidden")
+            self.query_one("#new-domain-seeds-path").set_class(not is_import, "hidden")
+
+    def _domain_type(self) -> str:
+        radio = self.query_one("#type-radio", RadioSet)
+        if radio.pressed_button and radio.pressed_button.id == "rb-type-embedding":
+            return "embedding"
+        return "lm"
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "new-domain-cancel":
@@ -84,14 +97,15 @@ class NewDomainScreen(ModalScreen):
             if not name or " " in name:
                 self.app.notify("Enter a valid domain name (no spaces).", severity="warning")
                 return
-            radio = self.query_one(RadioSet)
-            pressed = radio.pressed_button and radio.pressed_button.id
+            source_radio = self.query_one("#source-radio", RadioSet)
+            pressed = source_radio.pressed_button and source_radio.pressed_button.id
+            domain_type = self._domain_type()
             if pressed == "rb-import":
                 seeds = self.query_one("#new-domain-seeds-path", Input).value.strip()
-                cmd = ["python3", "cli.py", "init", name, "--seeds", seeds]
+                cmd = ["python3", "cli.py", "init", name, "--seeds", seeds, "--type", domain_type]
             else:
                 desc = self.query_one("#new-domain-desc", TextArea).text.strip() or f"{name} domain"
-                cmd = ["python3", "cli.py", "init", name, "--desc", desc]
+                cmd = ["python3", "cli.py", "init", name, "--desc", desc, "--type", domain_type]
             result = subprocess.run(cmd, capture_output=True, text=True)
             if result.returncode == 0:
                 self.dismiss({"name": name, "success": True})

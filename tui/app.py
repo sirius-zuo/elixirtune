@@ -3,9 +3,9 @@ from pathlib import Path
 from textual.app import App, ComposeResult
 from textual.reactive import reactive
 from textual.widget import Widget
-from textual.widgets import Header, TabbedContent, TabPane
+from textual.widgets import Header, TabbedContent, TabPane, Label
 
-from tui.domain import scan_domains
+from tui.domain import scan_domains, read_domain_type
 from tui.sidebar import Sidebar, DomainSelected, NewDomainRequested, DeleteDomainRequested
 
 
@@ -26,6 +26,13 @@ from tui.panels.synthetic import SyntheticPanel
 from tui.panels.training import TrainingPanel
 from tui.panels.evaluation import EvaluationPanel
 from tui.panels.deployment import DeploymentPanel
+from tui.panels.embedding_training import EmbeddingTrainingPanel
+from tui.panels.embedding_eval import EmbeddingEvalPanel
+
+
+_LM_TABS = ["tab-overview", "tab-synth", "tab-training", "tab-eval", "tab-deploy", "tab-chat"]
+_EMBED_TABS = ["tab-overview", "tab-embed-data", "tab-embed-train", "tab-embed-eval"]
+_ALL_TABS = list(dict.fromkeys(_LM_TABS + _EMBED_TABS))  # ordered, deduped
 
 
 class ElixirTuneApp(App):
@@ -58,6 +65,7 @@ class ElixirTuneApp(App):
         with TabbedContent(id="main-tabs"):
             with TabPane("Overview", id="tab-overview"):
                 yield OverviewPanel(id="panel-overview")
+            # LM-only tabs
             with TabPane("Synth", id="tab-synth"):
                 yield SyntheticPanel(id="panel-synth")
             with TabPane("Training", id="tab-training"):
@@ -67,8 +75,15 @@ class ElixirTuneApp(App):
             with TabPane("Deploy", id="tab-deploy"):
                 yield DeploymentPanel(id="panel-deploy")
             with TabPane("Chat", id="tab-chat"):
-                from tui.panels.chat import ChatPanel  # local import avoids circular dep
+                from tui.panels.chat import ChatPanel
                 yield ChatPanel(id="panel-chat")
+            # Embedding-only tabs
+            with TabPane("Embed Data", id="tab-embed-data"):
+                yield Label("Import or convert data using the buttons below.")
+            with TabPane("Embed Train", id="tab-embed-train"):
+                yield EmbeddingTrainingPanel(id="panel-embed-train")
+            with TabPane("Embed Eval", id="tab-embed-eval"):
+                yield EmbeddingEvalPanel(id="panel-embed-eval")
 
     async def on_mount(self) -> None:
         await self._rescan()
@@ -124,8 +139,27 @@ class ElixirTuneApp(App):
         self._current_domain = domain
         for panel in self.query(BasePanel):
             panel.domain = domain
+        ws = self._root / "workspaces" / domain
+        domain_type = read_domain_type(ws)
+        self._update_tabs_for_type(domain_type)
         self.call_later(self._rescan)
+
+    def _update_tabs_for_type(self, domain_type: str) -> None:
+        tc = self.query_one(TabbedContent)
+        visible = set(_LM_TABS if domain_type == "lm" else _EMBED_TABS)
+        for tab_id in _ALL_TABS:
+            if tab_id == "tab-overview":
+                continue  # always visible
+            try:
+                if tab_id in visible:
+                    tc.show_tab(tab_id)
+                else:
+                    tc.hide_tab(tab_id)
+            except Exception:
+                pass
 
     async def _rescan(self) -> None:
         domains = scan_domains(self._root)
-        await self.query_one(Sidebar).refresh_domains(domains, active=self._current_domain)
+        await self.query_one(Sidebar).refresh_domains(
+            domains, active=self._current_domain
+        )

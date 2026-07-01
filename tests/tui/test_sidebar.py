@@ -1,4 +1,5 @@
 import pytest
+import yaml
 from pathlib import Path
 from textual.app import App, ComposeResult
 from tui.sidebar import Sidebar, DomainSelected, NewDomainRequested
@@ -56,3 +57,16 @@ async def test_sidebar_new_domain_button_emits_message():
         await pilot.click("#new-domain-btn")
         await pilot.pause()
         assert received
+
+
+async def test_sidebar_shows_em_badge_for_embedding_domain(tmp_path):
+    ws = tmp_path / "workspaces" / "emb"
+    ws.mkdir(parents=True)
+    (ws / "config.yaml").write_text(yaml.safe_dump({"type": "embedding"}))
+    from tui.app import ElixirTuneApp
+    async with ElixirTuneApp(root=tmp_path).run_test() as pilot:
+        from textual.widgets import ListItem, Label
+        items = list(pilot.app.query(ListItem))
+        for item in items:
+            label = item.query_one(Label, Label)
+            assert "[EM]" in label.content

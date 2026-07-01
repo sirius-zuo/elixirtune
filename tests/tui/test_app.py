@@ -1,4 +1,5 @@
 import pytest
+import yaml
 from pathlib import Path
 from tui.app import ElixirTuneApp
 from tui.sidebar import Sidebar
@@ -44,3 +45,20 @@ async def test_new_domain_cancel_closes_modal(tmp_path):
         await pilot.pause()
         from tui.new_domain import NewDomainScreen
         assert not any(isinstance(s, NewDomainScreen) for s in pilot.app.screen_stack)
+
+
+async def test_embedding_domain_shows_embedding_tabs(tmp_path):
+    ws = tmp_path / "workspaces" / "emb"
+    ws.mkdir(parents=True)
+    (ws / "config.yaml").write_text(yaml.safe_dump({"type": "embedding"}))
+    async with ElixirTuneApp(initial_domain="emb", root=tmp_path).run_test() as pilot:
+        tc = pilot.app.query_one(TabbedContent)
+        assert tc.query_one("#tab-embed-train") is not None
+
+
+async def test_lm_domain_shows_lm_tabs(tmp_path):
+    ws = tmp_path / "workspaces" / "lm"
+    ws.mkdir(parents=True)
+    async with ElixirTuneApp(initial_domain="lm", root=tmp_path).run_test() as pilot:
+        tc = pilot.app.query_one(TabbedContent)
+        assert tc.query_one("#tab-training") is not None

@@ -13,3 +13,14 @@ training:
 dpo:
   beta: 0.1        # DPO preference strength (only used when method=dpo)
   from_base: false # false = continue from the SFT-fused model; true = fresh LoRA on base
+embedding:
+  batch_size: 32
+  learning_rate: 2.0e-05
+  iters: 100
+  loss_type: infonce
+  temperature: 0.05
+  margin: 1.0
+  normalize_embeddings: true
+  anchor_column: anchor
+  positive_column: positive
+  negative_column: null
