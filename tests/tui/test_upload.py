@@ -100,3 +100,19 @@ async def test_upload_modal_validation_empty_side_of_slash():
         await pilot.pause()
         label = pilot.app.screen.query_one("#hf-error", Label)
         assert "username/repo" in str(label.content).lower()
+
+
+async def test_upload_modal_labels_have_no_border():
+    """Labels must not be bordered, or their 1-row height leaves no room for text."""
+    async with ModalApp().run_test(size=(80, 30)) as pilot:
+        for label in pilot.app.screen.query(Label):
+            assert label.styles.border_top[0] == ""
+
+
+async def test_upload_modal_fields_fit_within_dialog_width():
+    """Input/Checkbox must be constrained to the dialog width, not stretched full-screen."""
+    async with ModalApp().run_test(size=(80, 30)) as pilot:
+        repo_width = pilot.app.screen.query_one("#hf-repo-name", Input).region.width
+        token_width = pilot.app.screen.query_one("#hf-token", Input).region.width
+        assert repo_width <= 60
+        assert token_width <= 60

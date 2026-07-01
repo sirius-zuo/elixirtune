@@ -193,6 +193,9 @@ class DeployApp(App):
     def on_mount(self) -> None:
         self.query_one(DeploymentPanel).domain = self._ws.name
 
+    async def _rescan(self) -> None:
+        pass
+
 
 async def test_ollama_button_disabled_without_fused(tmp_path):
     ws = tmp_path / "workspaces" / "d"
@@ -402,17 +405,47 @@ async def test_gguf_button_enabled_with_fused(tmp_path):
         assert not btn.disabled
 
 
-async def test_gguf_button_click_runs_export_command(tmp_path):
-    """Clicking Export GGUF must trigger the export-gguf CLI command."""
+async def test_gguf_button_click_opens_modal(tmp_path):
+    """Clicking Export GGUF must open the config modal, not run the command directly."""
     ws = tmp_path / "workspaces" / "d"
     (ws / "fused").mkdir(parents=True)
     (ws / "fused" / "model.safetensors").write_text("x")
     import os; os.chdir(tmp_path)
     async with DeployApp(ws).run_test() as pilot:
         await pilot.pause()
-        # Verify button exists and is enabled
-        from textual.widgets import Button
-        btn = pilot.app.query_one("#gguf-btn", Button)
-        assert not btn.disabled
-        # Verify the button has an id that maps to export-gguf handling
-        assert btn.id == "gguf-btn"
+        await pilot.click("#gguf-btn")
+        await pilot.pause()
+        from tui.gguf_export_modal import GGUFExportScreen
+        assert any(isinstance(s, GGUFExportScreen) for s in pilot.app.screen_stack)
+
+
+async def test_gguf_modal_confirm_runs_export_command_with_chosen_params(tmp_path, monkeypatch):
+    """Confirming the modal must run export-gguf with the chosen quantization/output path."""
+    ws = tmp_path / "workspaces" / "d"
+    (ws / "fused").mkdir(parents=True)
+    (ws / "fused" / "model.safetensors").write_text("x")
+    import os; os.chdir(tmp_path)
+
+    captured_cmd = {}
+
+    def fake_stream_subprocess(cmd):
+        captured_cmd["cmd"] = cmd
+        return iter([(None, 0)])
+
+    import tui.panels.deployment as deployment_module
+    monkeypatch.setattr(deployment_module, "stream_subprocess", fake_stream_subprocess)
+
+    async with DeployApp(ws).run_test() as pilot:
+        await pilot.pause()
+        await pilot.click("#gguf-btn")
+        await pilot.pause()
+        from textual.widgets import Select, Input
+        pilot.app.screen.query_one("#gguf-quantization", Select).value = "Q8_0"
+        pilot.app.screen.query_one("#gguf-output-path", Input).value = "custom/out.gguf"
+        await pilot.click("#gguf-export-confirm")
+        await pilot.pause(0.3)
+        assert captured_cmd["cmd"] == [
+            "python3", "cli.py", "export-gguf", "d",
+            "--quantization", "Q8_0",
+            "--output-path", "custom/out.gguf",
+        ]
