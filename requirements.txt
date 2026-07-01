@@ -23,6 +23,7 @@ tokenizers>=0.13.0
 # Optional evaluation packages (install manually if needed)
 # evaluate>=0.4.0
 # bert-score>=0.3.13
+# beir>=1.0  # BEIR benchmark for embedding evaluation (heavy install)
 
 # File I/O
 safetensors>=0.3.0
