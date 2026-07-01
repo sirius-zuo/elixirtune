@@ -90,8 +90,16 @@ class DeploymentPanel(BasePanel):
                 self._run_upload(captured_domain, result["repo"], result["private"], result["token"])
             self.app.push_screen(HFUploadScreen(), callback=_on_upload_result)
         elif event.button.id == "gguf-btn":
-            event.button.disabled = True
-            self._run_export_gguf(self.domain)
+            from tui.gguf_export_modal import GGUFExportScreen
+            captured_domain = self.domain
+            def _on_gguf_result(result) -> None:
+                if result is None:
+                    return
+                self.query_one("#gguf-btn", Button).disabled = True
+                self._run_export_gguf(
+                    captured_domain, result["quantization"], result["output_path"]
+                )
+            self.app.push_screen(GGUFExportScreen(captured_domain), callback=_on_gguf_result)
 
     @work(thread=True)
     def _run_fuse(self, domain: str) -> None:
@@ -152,11 +160,13 @@ class DeploymentPanel(BasePanel):
             self.post_message(RunnerDone(1))
 
     @work(thread=True)
-    def _run_export_gguf(self, domain: str) -> None:
+    def _run_export_gguf(self, domain: str, quantization: str, output_path: str | None) -> None:
         cmd = [
             "python3", "cli.py", "export-gguf", domain,
-            "--quantization", "Q4_K_M",
+            "--quantization", quantization,
         ]
+        if output_path:
+            cmd += ["--output-path", output_path]
         self._stream(cmd)
 
     def _stream(self, cmd: list[str]) -> None:
