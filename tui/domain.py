@@ -142,7 +142,13 @@ def generate_runtime_configs(ws: Path, root: Path = Path(".")) -> None:
             "adapter_dir": str(resolve_adapters_dir(ws)),
             "fused_model_dir": str(ws / "fused"),
             "checkpoint_dir": str(ws / "checkpoints"),
-        }
+        },
+        "embedding": {
+            "output_dir": str(ws / "adapters"),
+        },
+        "cross_encoder": {
+            "output_dir": str(ws / "ce_adapters"),
+        },
     }, "runtime_model_config.yaml")
 
     overlay("config/training_config.yaml", {
