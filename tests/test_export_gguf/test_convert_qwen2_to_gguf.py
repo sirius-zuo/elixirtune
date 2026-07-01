@@ -63,3 +63,33 @@ def test_tokenizer_token_list_padded_to_config_vocab_size(tmp_path):
 
     assert len(writer.tokens) == 16
     assert writer.vocab_size == 16
+
+
+@pytest.mark.parametrize(
+    "gguf_name,ndim,expected",
+    [
+        ("blk.0.attn_norm.weight", 1, "float32"),
+        ("blk.0.ffn_norm.weight", 1, "float32"),
+        ("output_norm.weight", 1, "float32"),
+        ("blk.0.attn_k.bias", 1, "float32"),
+        ("blk.0.attn_q.bias", 1, "float32"),
+        ("token_embd.weight", 2, "float16"),
+        ("output.weight", 2, "float16"),
+        ("blk.0.attn_q.weight", 2, "float16"),
+    ],
+)
+def test_tensor_dtype_matches_llama_cpp_convention(gguf_name, ndim, expected):
+    """1D tensors (biases) and *_norm.weight must be F32.
+
+    llama.cpp's ggml-metal elementwise ops (bias-add, RMSNorm scale) assert
+    both operands are F32 (ggml_metal_op_bin: GGML_ASSERT(op->src[1]->type
+    == GGML_TYPE_F32)). Writing these as F16 makes llama-server crash during
+    the first forward pass with that assertion. This matches the upstream
+    convert_hf_to_gguf.py rule: 'if n_dims <= 1 or new_name.endswith(
+    "_norm.weight"): data_qtype = F32'.
+    """
+    pytest.importorskip("gguf")
+    sys.path.insert(0, str(_root / "src"))
+    from utils.convert_qwen2_to_gguf import _tensor_dtype
+
+    assert _tensor_dtype(gguf_name, ndim).__name__ == expected
