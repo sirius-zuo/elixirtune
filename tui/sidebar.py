@@ -39,6 +39,7 @@ class Sidebar(Widget):
         yield Rule()
 
     async def refresh_domains(self, domains: list[DomainState], active: str | None = None) -> None:
+        from tui.domain import read_domain_type
         self._active = active
         lv = self.query_one(ListView)
         await lv.clear()
@@ -46,7 +47,9 @@ class Sidebar(Widget):
         for i, d in enumerate(domains):
             dot = "●" if d.name == active else "○"
             mark = " [b white]✓[/]" if d.status in (Status.DEPLOYED, Status.EVALUATED) else ""
-            lv.append(ListItem(Label(f"{dot} {d.name}{mark}"), id=f"domain-{d.name}"))
+            dtype = read_domain_type(d.workspace)
+            badge = " [dim][EM][/]" if dtype == "embedding" else " [dim][LM][/]"
+            lv.append(ListItem(Label(f"{dot} {d.name}{badge}{mark}"), id=f"domain-{d.name}"))
             if d.name == active:
                 active_index = i
         if active_index is not None:
