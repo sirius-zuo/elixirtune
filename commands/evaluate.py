@@ -45,6 +45,9 @@ def evaluate(
             raise typer.Exit(1)
         model_cfg = yaml.safe_load(cfg_path.read_text())
         base_model = model_cfg["base_model"]["path"]
+        if eval_config is None:
+            typer.echo("--eval-config is required for method=lm", err=True)
+            raise typer.Exit(1)
         evaluator = ModelEvaluator(str(eval_config))
         if adapters_path and Path(adapters_path).exists():
             evaluator.comprehensive_model_comparison(
@@ -76,6 +79,13 @@ def evaluate(
             from sentence_transformers import CrossEncoder
             ce_cfg = model_cfg.get("cross_encoder", {})
             ce_path = str(ws / "ce_adapters") if (ws / "ce_adapters").exists() else ce_cfg.get("base_model", "")
+            if not ce_path:
+                typer.echo(
+                    "No cross-encoder found. Train one first (train --method cross-encoder) "
+                    "or set cross_encoder.base_model in model config.",
+                    err=True,
+                )
+                raise typer.Exit(1)
             loaded_model, tokenizer = CrossEncoder(ce_path), None
 
         val_path = val_data or ws / "processed" / "embedding_val.json"
@@ -88,6 +98,19 @@ def evaluate(
             beir_result = run_beir(beir_dataset, loaded_model, tokenizer)
             for key, val in beir_result.items():
                 typer.echo(f"BEIR {beir_dataset} {key}: {val:.4f}")
+
+        if val_path.exists() and method == "cross-encoder":
+            import json as _json
+            val_records = _json.loads(Path(val_path).read_text())
+            pairs = [
+                (r["anchor"], r["positive"])
+                for r in val_records
+                if "anchor" in r and "positive" in r
+            ]
+            if pairs:
+                scores = loaded_model.predict(pairs)
+                typer.echo(f"mean_positive_score: {float(scores.mean()):.4f}")
+                typer.echo(f"evaluated_pairs: {len(pairs)}")
     else:
         typer.echo(f"Unknown method '{method}'. Choose: lm, embedding, cross-encoder", err=True)
         raise typer.Exit(1)

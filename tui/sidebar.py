@@ -46,9 +46,12 @@ class Sidebar(Widget):
         active_index = None
         for i, d in enumerate(domains):
             dot = "●" if d.name == active else "○"
-            mark = " [b white]✓[/]" if d.status in (Status.DEPLOYED, Status.EVALUATED) else ""
             dtype = read_domain_type(d.workspace)
             badge = " [dim][EM][/]" if dtype == "embedding" else " [dim][LM][/]"
+            if dtype == "embedding":
+                mark = " [b white]✓[/]" if d.status in (Status.TRAINED, Status.CE_TRAINED) else ""
+            else:
+                mark = " [b white]✓[/]" if d.status in (Status.DEPLOYED, Status.EVALUATED) else ""
             lv.append(ListItem(Label(f"{dot} {d.name}{badge}{mark}"), id=f"domain-{d.name}"))
             if d.name == active:
                 active_index = i

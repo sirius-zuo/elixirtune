@@ -75,7 +75,6 @@ def run_beir(dataset_name: str, model, tokenizer) -> dict[str, float]:
         from beir import util as beir_util
         from beir.datasets.data_loader import GenericDataLoader
         from beir.retrieval.evaluation import EvaluateRetrieval
-        from beir.retrieval import models as beir_models
     except ImportError:
         return {"error": "beir package not installed"}
 

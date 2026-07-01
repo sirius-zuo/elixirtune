@@ -161,12 +161,8 @@ class EmbeddingTrainingPanel(BasePanel):
     @work(thread=True)
     def _run_train(self, domain: str, method: str) -> None:
         ws = Path("workspaces") / domain
-        if method == "cross-encoder":
-            train_data = ws / "processed" / "embedding_train.json"
-            val_data = ws / "processed" / "embedding_val.json"
-        else:
-            train_data = ws / "processed" / "embedding_train.json"
-            val_data = ws / "processed" / "embedding_val.json"
+        train_data = ws / "processed" / "embedding_train.json"
+        val_data = ws / "processed" / "embedding_val.json"
         val_args = ["--val-data", str(val_data)] if val_data.exists() else []
         cmd = [
             "python3", "cli.py", "train", domain,

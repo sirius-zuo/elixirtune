@@ -38,6 +38,6 @@ def init(
     if desc:
         (ws / "description.txt").write_text(desc)
     cfg_path = ws / "config.yaml"
-    existing = yaml.safe_load(cfg_path.read_text()) if cfg_path.exists() else {}
+    existing = (yaml.safe_load(cfg_path.read_text()) or {}) if cfg_path.exists() else {}
     existing["type"] = type
     cfg_path.write_text(yaml.safe_dump(existing))

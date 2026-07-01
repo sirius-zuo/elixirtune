@@ -41,7 +41,7 @@ def run(
 
     raw = json.loads(Path(train_data_path).read_text())
     train_ds = Dataset.from_list(raw)
-    eval_ds = Dataset.from_list(json.loads(Path(val_data_path).read_text())) if val_data_path else None
+    eval_ds = Dataset.from_list(json.loads(Path(val_data_path).read_text())) if val_data_path and Path(val_data_path).exists() else None
 
     negative_col = t_cfg.get("negative_column") or None
 
