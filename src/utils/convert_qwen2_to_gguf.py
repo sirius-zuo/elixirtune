@@ -66,8 +66,30 @@ def _hf_to_gguf_name(hf_name: str, num_layers: int, tnm: gguf.TensorNameMap) -> 
     return gguf_base + suffix
 
 
-def _write_qwen2_tokenizer(writer: gguf.GGUFWriter, model_dir: Path) -> None:
-    """Write Qwen2 BPE tokenizer metadata from tokenizer.json."""
+def _tensor_dtype(gguf_name: str, ndim: int) -> type:
+    """1D tensors (biases) and *_norm.weight must stay F32.
+
+    llama.cpp's elementwise ops (bias-add, RMSNorm scale) only support F32
+    operands -- ggml-metal's ggml_metal_op_bin asserts both operands are
+    GGML_TYPE_F32, so writing these as F16 crashes llama-server on the first
+    forward pass. Matches upstream convert_hf_to_gguf.py's rule: "if n_dims
+    <= 1 or new_name.endswith('_norm.weight'): data_qtype = F32".
+    """
+    if ndim <= 1 or gguf_name.endswith("_norm.weight"):
+        return np.float32
+    return np.float16
+
+
+def _write_qwen2_tokenizer(writer: gguf.GGUFWriter, model_dir: Path, vocab_size: int) -> None:
+    """Write Qwen2 BPE tokenizer metadata from tokenizer.json.
+
+    The token list must have exactly `vocab_size` entries: that's the row
+    count of the token_embd.weight tensor (from config.json), which can be
+    larger than the highest id tokenizer.json actually names -- Qwen2
+    checkpoints pad the embedding matrix with unnamed reserved rows. A
+    shorter token list here makes llama.cpp reject the model with
+    'check_tensor_dims: tensor token_embd.weight has wrong shape'.
+    """
     tj = json.loads((model_dir / "tokenizer.json").read_text())
     tc = json.loads((model_dir / "tokenizer_config.json").read_text())
 
@@ -83,11 +105,11 @@ def _write_qwen2_tokenizer(writer: gguf.GGUFWriter, model_dir: Path) -> None:
         if entry.get("special"):
             special_ids.add(entry["id"])
 
-    max_id = max(all_tokens)
-    tokens = [all_tokens.get(i, f"[PAD{i}]") for i in range(max_id + 1)]
+    total = max(vocab_size, max(all_tokens) + 1)
+    tokens = [all_tokens.get(i, f"[PAD{i}]") for i in range(total)]
     token_types = [
         TOKEN_TYPE_CONTROL if i in special_ids else TOKEN_TYPE_NORMAL
-        for i in range(max_id + 1)
+        for i in range(total)
     ]
 
     # Merges: stored as ["A","B"] pairs or "A B" strings → write as "A B"
@@ -163,7 +185,7 @@ def convert(model_dir: Path, output: Path) -> None:
     # ── Tokenizer ─────────────────────────────────────────────────────────────
     print("Writing tokenizer...")
     try:
-        _write_qwen2_tokenizer(writer, model_dir)
+        _write_qwen2_tokenizer(writer, model_dir, vocab_size)
     except Exception as e:
         print(f"  Warning: tokenizer write failed ({e}); GGUF will lack tokenizer", file=sys.stderr)
 
@@ -213,7 +235,7 @@ def convert(model_dir: Path, output: Path) -> None:
         if gguf_name is None:
             print(f"  skip  {hf_name} (unmapped)")
             return
-        arr = arr.astype(np.float16)
+        arr = arr.astype(_tensor_dtype(gguf_name, arr.ndim))
         writer.add_tensor(gguf_name, arr)
         written += 1
         print(f"  [{written:4d}] {hf_name:60s} → {gguf_name}  {arr.shape}")
