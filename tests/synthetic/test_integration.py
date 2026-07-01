@@ -2,8 +2,8 @@ import os
 import pytest
 
 
-@pytest.mark.skipif(not os.environ.get("ELIXIRLORA_LIVE"),
-                    reason="set ELIXIRLORA_LIVE=1 with a local llama.cpp server on :8080")
+@pytest.mark.skipif(not os.environ.get("ELIXIRTUNE_LIVE"),
+                    reason="set ELIXIRTUNE_LIVE=1 with a local llama.cpp server on :8080")
 def test_end_to_end_against_local_llamacpp(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     from typer.testing import CliRunner

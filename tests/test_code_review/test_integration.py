@@ -11,7 +11,7 @@ sys.path.insert(0, str(_root / "src"))
 def test_full_pipeline_on_tiny_subset(tmp_path):
     """
     Run the setup pipeline on a synthetic dataset to verify:
-    1. Seeds are valid ElixirLoRA format
+    1. Seeds are valid ElixirTune format
     2. prepare command can consume them
     3. Output has expected train/val/test structure
     """
@@ -90,7 +90,7 @@ def test_full_pipeline_on_tiny_subset(tmp_path):
         encoding="utf-8",
     )
 
-    # Verify the approved.jsonl is valid ElixirLoRA format
+    # Verify the approved.jsonl is valid ElixirTune format
     loaded = [json.loads(l) for l in approved_path.read_text(encoding="utf-8").splitlines() if l.strip()]
     assert len(loaded) == 3
     for rec in loaded:

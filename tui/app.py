@@ -28,8 +28,8 @@ from tui.panels.evaluation import EvaluationPanel
 from tui.panels.deployment import DeploymentPanel
 
 
-class ElixirLoRAApp(App):
-    TITLE = "ElixirLoRA"
+class ElixirTuneApp(App):
+    TITLE = "ElixirTune"
     CSS = """
     #main-tabs { height: 1fr; }
     TabPane { height: 1fr; }

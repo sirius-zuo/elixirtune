@@ -27,7 +27,7 @@ tokenizers>=0.13.0
 # File I/O
 safetensors>=0.3.0
 
-# ElixirLoRA synthetic data pipeline
+# ElixirTune synthetic data pipeline
 openai>=1.0
 pydantic>=2.0
 sentence-transformers>=2.2

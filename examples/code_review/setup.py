@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Download and convert the github-codereview dataset for ElixirLoRA."""
+"""Download and convert the github-codereview dataset for ElixirTune."""
 
 import argparse
 import hashlib
@@ -84,7 +84,7 @@ def convert_dataset(
     include_negative: bool = True,
     root: Path = Path("."),
 ) -> None:
-    """Download the github-codereview dataset and convert to ElixirLoRA seed format."""
+    """Download the github-codereview dataset and convert to ElixirTune seed format."""
 
     dataset_path = root / "data" / "code-review"
     dataset_path.mkdir(parents=True, exist_ok=True)
@@ -110,8 +110,8 @@ def convert_dataset(
         print("No records after filtering. Aborting.", file=sys.stderr)
         sys.exit(1)
 
-    # Convert to ElixirLoRA format
-    print(f"Converting {len(dataset)} records to ElixirLoRA seed format...")
+    # Convert to ElixirTune format
+    print(f"Converting {len(dataset)} records to ElixirTune seed format...")
     seeds = []
     for record in tqdm(dataset, desc="Converting"):
         user_content = build_user_message(record)
@@ -175,7 +175,7 @@ def convert_dataset(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Download code-review dataset for ElixirLoRA")
+    parser = argparse.ArgumentParser(description="Download code-review dataset for ElixirTune")
     parser.add_argument("--domain", default="code-review", help="Workspace domain name")
     parser.add_argument("--languages", default=None, help="Comma-separated list of languages to filter (e.g., 'Python,TypeScript')")
     parser.add_argument("--target", type=int, default=200000, help="Target number of samples")

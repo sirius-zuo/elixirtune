@@ -2,7 +2,7 @@
 
 Fine-tune Qwen2.5-7B to act as an automated code review assistant. This example downloads the
 [ronantakizawa/github-codereview](https://huggingface.co/datasets/ronantakizawa/github-codereview)
-dataset, converts it to ElixirLoRA seed format, and walks you through the full pipeline —
+dataset, converts it to ElixirTune seed format, and walks you through the full pipeline —
 synthetic data generation, fine-tuning, fusion, and GGUF export.
 
 ```
