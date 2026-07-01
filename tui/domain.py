@@ -13,9 +13,21 @@ class Status(str, Enum):
     TRAINED = "trained"
     EVALUATED = "evaluated"
     DEPLOYED = "deployed"
+    DATA_READY = "data_ready"
+    CE_TRAINED = "ce_trained"
 
 
-_STATUS_ORDER = list(Status)
+_STATUS_ORDER = [
+    Status.EMPTY,
+    Status.DATA_READY,
+    Status.SEEDED,
+    Status.GENERATED,
+    Status.PREPARED,
+    Status.TRAINED,
+    Status.CE_TRAINED,
+    Status.EVALUATED,
+    Status.DEPLOYED,
+]
 
 
 def status_order(s: Status) -> int:
@@ -42,8 +54,24 @@ def resolve_adapters_dir(ws: Path) -> Path:
     return ws / "adapters"
 
 
+def read_domain_type(ws: Path) -> str:
+    """Returns 'lm' or 'embedding'. Defaults to 'lm' if config.yaml absent or has no type."""
+    ws = Path(ws)
+    cfg = ws / "config.yaml"
+    if cfg.exists():
+        data = yaml.safe_load(cfg.read_text()) or {}
+        return data.get("type", "lm")
+    return "lm"
+
+
 def infer_status(ws: Path) -> Status:
     ws = Path(ws)
+    if read_domain_type(ws) == "embedding":
+        return _infer_embedding_status(ws)
+    return _infer_lm_status(ws)
+
+
+def _infer_lm_status(ws: Path) -> Status:
     if (ws / "fused").exists() and any((ws / "fused").iterdir()):
         return Status.DEPLOYED
     if (ws / "logs" / "evaluation").exists() and any(
@@ -61,6 +89,20 @@ def infer_status(ws: Path) -> Status:
     return Status.EMPTY
 
 
+def _infer_embedding_status(ws: Path) -> Status:
+    if (ws / "ce_adapters").exists() and any((ws / "ce_adapters").iterdir()):
+        return Status.CE_TRAINED
+    if (ws / "adapters").exists() and any((ws / "adapters").iterdir()):
+        return Status.TRAINED
+    if (ws / "processed" / "embedding_train.json").exists():
+        return Status.PREPARED
+    raw_dir = ws / "data" / "raw"
+    if (raw_dir.exists() and any(raw_dir.iterdir())) or \
+       (ws / "seeds" / "approved.jsonl").exists():
+        return Status.DATA_READY
+    return Status.EMPTY
+
+
 def scan_domains(root: Path = Path(".")) -> list[DomainState]:
     workspaces = Path(root) / "workspaces"
     if not workspaces.exists():
@@ -73,6 +115,10 @@ def scan_domains(root: Path = Path(".")) -> list[DomainState]:
 
 
 def _deep_merge(base: dict, override: dict) -> dict:
+    return _deep_merge_impl(base, override)
+
+
+def _deep_merge_impl(base: dict, override: dict) -> dict:
     out = deepcopy(base)
     for k, v in override.items():
         if isinstance(v, dict) and isinstance(out.get(k), dict):
